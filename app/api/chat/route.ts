@@ -3,9 +3,27 @@ import { NextResponse } from "next/server";
 import * as z from "zod";
 import { ChatOllama } from "@langchain/ollama"; // ✅ IMPORTANT
 import { LanguageModelLike } from "@langchain/core/language_models/base";
+import { requestWeatherAPI } from "@/app/helper";
 
 const getWeather = tool(
-  ({ city }: { city: string }) => `It's always sunny in ${city}!`,
+  async ({ city }: { city: string }) => {
+    try {
+      const result = await requestWeatherAPI(city);
+
+      if (!result) {
+        return "error while requesting weather api.. try again";
+      }
+      return {
+        weather: result?.condition.text,
+        temperature: result?.temp_c,
+        city,
+        icon: result?.condition.icon,
+        wind: result?.wind_kph,
+      };
+    } catch (error) {
+      return `error while requesting weather api.. error: ${error instanceof Error ? error.message : "no internet connection"}`;
+    }
+  },
   {
     name: "get_weather",
     description: "Get weather",
@@ -14,15 +32,29 @@ const getWeather = tool(
     }),
   },
 );
+const getCurrentTime = tool(
+  () => {
+    return `current time: ${new Date().toLocaleTimeString()}`;
+  },
+  {
+    name: "return_current_time",
+    description: "return current local time",
+  },
+);
 
-// ✅ Create model instance explicitly
 const model = new ChatOllama({
   model: "gemma4:e2b",
+  stop: ["Thinking:", "Reasoning:", "\n\nThinking", "1.  **Analyze"], // maxRetries: 10,
+  // model: "llama3.1:8b",
+  onFailedAttempt: () => console.log(""),
 }) as LanguageModelLike;
 
 const agent = createAgent({
+  //@ts-expect-error:model ts mismatch issue
   model,
-  tools: [getWeather],
+  systemPrompt:
+    "you are help full agent.. dont reasoning or thinking.You must NOT show your reasoning process",
+  tools: [getWeather, getCurrentTime],
 });
 
 export async function POST(req: Request) {
@@ -34,6 +66,8 @@ export async function POST(req: Request) {
     const stream = await agent.stream(body.input, {
       encoding: "text/event-stream",
       streamMode: ["values", "updates", "messages"],
+      // streamMode: ["messages"],
+
       recursionLimit: 10,
     });
 
@@ -53,4 +87,4 @@ export async function POST(req: Request) {
   }
 }
 
-export const runtime = "nodejs";
+// export const runtime = "nodejs";
