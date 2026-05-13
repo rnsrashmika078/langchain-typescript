@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
-import { StoryGraph } from "./test-graph";
+import { NextRequest } from "next/server";
+import { ToolAgent } from "./toolAgent";
 
-export async function POST() {
-  const res = await StoryGraph();
+export async function POST(req: NextRequest) {
+  const stream = await ToolAgent();
 
-  return NextResponse.json({
-    message: "success",
-    data: res,
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
   });
 }

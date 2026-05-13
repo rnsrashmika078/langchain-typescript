@@ -1,4 +1,4 @@
-import Image from "next/image";
+
 import ChatInterface from "./component/ChatInterface";
 
 export default function Home() {

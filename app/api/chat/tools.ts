@@ -10,13 +10,14 @@ const getWeather = tool(
       if (!result) {
         return "error while requesting weather api.. try again";
       }
-      return {
+      const weatherStatus = {
         weather: result?.condition.text,
         temperature: result?.temp_c,
         city,
         icon: result?.condition.icon,
         wind: result?.wind_kph,
       };
+      return `Weather status in ${city} : ${JSON.stringify(weatherStatus)}`;
     } catch (error) {
       return `error while requesting weather api.. error: ${error instanceof Error ? error.message : "no internet connection"}`;
     }
@@ -38,6 +39,5 @@ const getCurrentTime = tool(
     description: "return current local time",
   },
 );
-
 
 export const modelTools = [getWeather, getCurrentTime];

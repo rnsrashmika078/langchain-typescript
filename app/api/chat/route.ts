@@ -44,14 +44,19 @@ const getCurrentTime = tool(
 
 const model = new ChatOllama({
   model: "gemma4:e2b",
-  stop: ["Thinking:", "Reasoning:", "\n\nThinking", "1.  **Analyze"], // maxRetries: 10,
+
+  // stop: ["Thinking:", "Reasoning:", "\n\nThinking", "\n1.  **Analyze\n"],
+  think: true,
+  // maxRetries: 10,
   // model: "llama3.1:8b",
   onFailedAttempt: () => console.log(""),
-}) as LanguageModelLike;
+  // }) as LanguageModelLike;
+});
 
 const agent = createAgent({
-  //@ts-expect-error:model ts mismatch issue
+  //@ts--error:model ts mismatch issue
   model,
+
   systemPrompt:
     "you are help full agent.. dont reasoning or thinking.You must NOT show your reasoning process",
   tools: [getWeather, getCurrentTime],
@@ -65,11 +70,12 @@ export async function POST(req: Request) {
 
     const stream = await agent.stream(body.input, {
       encoding: "text/event-stream",
-      streamMode: ["values", "updates", "messages"],
+      streamMode: ["updates", "messages", "tools", "values", "checkpoints"],
       // streamMode: ["messages"],
 
       recursionLimit: 10,
     });
+    console.log("stream", stream);
 
     return new Response(stream, {
       headers: { "Content-Type": "text/event-stream" },
