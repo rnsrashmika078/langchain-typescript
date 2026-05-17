@@ -1,9 +1,10 @@
 import { createAgent } from "langchain";
 import { modelTools } from "./tools";
-
+import { llm } from "./model";
 
 export const agent = createAgent({
-  //@ts-expect-error:model ts mismatch issue
-  model,
-  // tools: modelTools,
+  model: llm,
+  systemPrompt:
+    "you are expert ai code assistant.use tailwind for styling ",
+  tools: modelTools,
 });

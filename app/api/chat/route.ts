@@ -4,78 +4,32 @@ import * as z from "zod";
 import { ChatOllama } from "@langchain/ollama"; // ✅ IMPORTANT
 import { LanguageModelLike } from "@langchain/core/language_models/base";
 import { requestWeatherAPI } from "@/app/helper";
-
-const getWeather = tool(
-  async ({ city }: { city: string }) => {
-    try {
-      const result = await requestWeatherAPI(city);
-
-      if (!result) {
-        return "error while requesting weather api.. try again";
-      }
-      return {
-        weather: result?.condition.text,
-        temperature: result?.temp_c,
-        city,
-        icon: result?.condition.icon,
-        wind: result?.wind_kph,
-      };
-    } catch (error) {
-      return `error while requesting weather api.. error: ${error instanceof Error ? error.message : "no internet connection"}`;
-    }
-  },
-  {
-    name: "get_weather",
-    description: "Get weather",
-    schema: z.object({
-      city: z.string(),
-    }),
-  },
-);
-const getCurrentTime = tool(
-  () => {
-    return `current time: ${new Date().toLocaleTimeString()}`;
-  },
-  {
-    name: "return_current_time",
-    description: "return current local time",
-  },
-);
-
-const model = new ChatOllama({
-  model: "gemma4:e2b",
-
-  // stop: ["Thinking:", "Reasoning:", "\n\nThinking", "\n1.  **Analyze\n"],
-  think: true,
-  // maxRetries: 10,
-  // model: "llama3.1:8b",
-  onFailedAttempt: () => console.log(""),
-  // }) as LanguageModelLike;
-});
-
-const agent = createAgent({
-  //@ts--error:model ts mismatch issue
-  model,
-
-  systemPrompt:
-    "you are help full agent.. dont reasoning or thinking.You must NOT show your reasoning process",
-  tools: [getWeather, getCurrentTime],
-});
+import { llm } from "./model";
+import { agent } from "./agent";
+import { modelTools } from "./tools";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    console.log("body", body);
+    console.log("rootPath", body.input.rootPath);
+    console.log("fileTree", body.input.fileTree);
+
+    const agent = createAgent({
+      model: llm,
+      systemPrompt: `YOU ARE EXPERT AI CODE ASSISTANT.
+            NOTE: ROOT PROJECT PATH ( USE THIS PATH TO AS A PROJECT FILE ROOT PATH): ${JSON.stringify(body.input.rootPath)}
+            NOTE: CURRENT OPEN PROJECT STRUCTURE (): ${JSON.stringify(body.input.fileTree)}
+        `,
+      tools: modelTools,
+    });
 
     const stream = await agent.stream(body.input, {
       encoding: "text/event-stream",
       streamMode: ["updates", "messages", "tools", "values", "checkpoints"],
       // streamMode: ["messages"],
-
       recursionLimit: 10,
     });
-    console.log("stream", stream);
 
     return new Response(stream, {
       headers: { "Content-Type": "text/event-stream" },
@@ -92,5 +46,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-// export const runtime = "nodejs";

@@ -32,7 +32,9 @@ const ChatMessages = memo(
           console.log("isLoading", isLoading);
 
           return (
-            <div key={msg.id || messageIndex}>
+            <div
+            
+            key={msg.id || messageIndex}>
               {/* Message */}
               <div
                 className={`flex p-2 ${
