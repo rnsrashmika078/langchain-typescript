@@ -55,10 +55,16 @@ const generateCode = tool(
 );
 const createFile = tool(
   async ({ filePath, content }: { filePath: string; content: string }) => {
-    const dir = path.dirname(filePath);
-    console.log("dir", dir);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(filePath, content);
+    try {
+      const dir = path.dirname(filePath);
+      console.log("dir", dir);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(filePath, content);
+
+      return `file created successfully with filePath: ${filePath}`;
+    } catch (e) {
+      return `${e instanceof Error ? e.message : "Error while create file"}`;
+    }
   },
   {
     name: "create_file",

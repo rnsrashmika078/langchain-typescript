@@ -31,12 +31,12 @@ export default function ChatInterface() {
     });
   }, []);
 
-  const { messages, submit, isLoading, stop } = useStream({
+  const { messages, submit, isLoading, stop, interrupts } = useStream({
     transport,
   });
 
   const [input, setInput] = useState<string>("");
-  console.log("messages", messages);
+  console.log("interrupts", interrupts);
 
   const formattedMessage = useMemo(() => {
     return messages.map(

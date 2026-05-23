@@ -1,3 +1,4 @@
+
 export const requestWeatherAPI = async (city: string) => {
   try {
     const res = await fetch(
