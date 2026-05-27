@@ -1,12 +1,27 @@
 import { requestWeatherAPI } from "@/app/helper";
 import { mkdirSync, writeFileSync } from "fs";
-import { tool } from "langchain";
+import { tool, ToolRuntime } from "langchain";
 import path from "path";
 import * as z from "zod";
+import { run_langgraph } from "../graph/file-system-graph";
 
 const getWeather = tool(
-  async ({ city }: { city: string }) => {
+  async (
+    {
+      city,
+      country,
+    }: {
+      city: string;
+      country: string;
+    },
+    config: ToolRuntime,
+  ) => {
     try {
+      const writer = config.writer;
+
+      if (writer) {
+        writer("Calling Weather Tool...");
+      }
       const result = await requestWeatherAPI(city);
 
       if (!result) {
@@ -28,6 +43,7 @@ const getWeather = tool(
     description: "Get weather",
     schema: z.object({
       city: z.string(),
+      country: z.string(),
     }),
   },
 );
@@ -78,8 +94,9 @@ const createFile = tool(
 );
 
 export const modelTools = [
-  getWeather,
-  getCurrentTime,
-  generateCode,
-  createFile,
+  // getWeather,
+  // getCurrentTime,
+  // generateCode,
+  // createFile,
+  run_langgraph,
 ];
