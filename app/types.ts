@@ -32,5 +32,13 @@ type TMessage = {
   };
   status: string;
 };
+export interface Tree {
+  id: string;
+  type: string;
+  name: string;
+  path: string;
+  isExpanded: boolean;
+  children?: Tree[];
+}
 
 export interface ExtendedMessage extends LCMessage, TMessage {}

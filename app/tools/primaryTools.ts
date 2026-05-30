@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { requestWeatherAPI } from "@/app/helper";
 import { mkdirSync, writeFileSync } from "fs";
 import { tool, ToolRuntime } from "langchain";
 import path from "path";
 import * as z from "zod";
-import { run_langgraph } from "../graph/file-system-graph";
+import { exec } from "child_process";
+import { cwd } from "process";
+import { run_langgraph } from "../graphs/graph2/powershellCommand";
 
 const getWeather = tool(
   async (
@@ -93,10 +96,42 @@ const createFile = tool(
   },
 );
 
+// const executePowerShellCommands = tool(
+//   async ({ command }: { command: string }, runtime: ToolRuntime) => {
+//     const rootPath = runtime?.configurable?.rootPath;
+//     const safeCommand = `
+//     ${command} | Where-Object { $_.FullName -notmatch "node_modules" }
+//     `;
+
+//     const modified = safeCommand.replace("-Path" , `-Path "${rootPath}" `)
+//     return new Promise((resolve) => {
+//       exec(
+//         `powershell -Command "${modified}"`,
+//         { cwd: rootPath },
+//         (error, stdout, stderr) => {
+//           if (error) return resolve(error.message);
+//           if (stderr) return resolve(stderr);
+//           resolve(stdout);
+//         },
+//       );
+//     });
+//   },
+//   {
+//     name: "executePowerShellCommands",
+//     description:
+//       "run POWERSHELL commands only..ALWAYS EXCLUDE 'node_modules' folder",
+//     schema: z.object({
+//       command: z.string(),
+//     }),
+//   },
+// );
+
 export const modelTools = [
   // getWeather,
   // getCurrentTime,
   // generateCode,
   // createFile,
-  run_langgraph,
+  // run_langgraph,
+  // executePowerShellCommands,
+  run_langgraph
 ];

@@ -1,0 +1,13 @@
+import { ChatOllama } from "@langchain/ollama";
+import schema from "../../schema.json"
+export const languageModel = new ChatOllama({
+  model:schema.languageModel.model,
+  think: schema.languageModel.reasoning,
+  temperature:schema.languageModel.temperature
+
+});
+export const graphLanguageModel = new ChatOllama({
+  model:schema.languageModel.graphLanguageModel.model,
+  think: schema.languageModel.graphLanguageModel.reasoning,
+  temperature:schema.languageModel.graphLanguageModel.temperature
+});

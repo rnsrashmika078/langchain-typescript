@@ -1,84 +1,61 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { createAgent, HITLResponse, humanInTheLoopMiddleware } from "langchain";
+import { HITLResponse } from "langchain";
 import { NextResponse } from "next/server";
-import * as z from "zod";
-import { llm } from "./model";
-import { modelTools } from "./tools";
 import { Command } from "@langchain/langgraph";
-import { checkpointer } from "@/app/redisSaver";
+import { mainAgent } from "@/app/agents/agent";
+import connectDB from "@/app/libs/mongodb/connectDB";
+import Thread from "@/app/libs/mongodb/Threads";
 
-const agent = createAgent({
-  model: llm,
-  systemPrompt: `
-You are an expert React Vite developer AI agent inside an Electron app.
-
-You MUST follow this loop:
-
-1. THINK: decide what to do
-2. TOOL: call a tool if needed
-3. OBSERVE: read the result
-4. REPEAT until task is complete
-5. FINAL: give final answer. must be very very short. like few lines
-
-Rules:
-- You can call MULTIPLE tools step by step
-- After each tool call, you MUST continue reasoning
-- DO NOT stop after one tool if task is incomplete
-- ALWAYS prefer tools for project-related actions
-- Each user request is independent (stateless)
-
-Available tools:
-- run_langgraph → for file related operations: example : Create/generate files
-`,
-  tools: modelTools,
-  middleware: [
-    humanInTheLoopMiddleware({
-      interruptOn: {
-        create_file: {
-          allowedDecisions: ["approve", "reject"],
-          description: "🚨 Create file execution requires User approval",
-        },
-        get_weather: {
-          allowedDecisions: ["approve", "reject"],
-          description: "To get weather we need User approval ?",
-        },
-        run_langgraph: {
-          allowedDecisions: ["approve", "reject"],
-          description: "Do you want to run ?",
-        },
-      },
-    }),
-  ],
-  checkpointer: checkpointer,
-});
 export async function POST(req: Request) {
   try {
+    await connectDB();
     const body = await req.json();
-    const interruptResponse = body.input.interruptResponse as HITLResponse;
+    console.log("BODY", body);
+    const threadId = body.input.threadId;
 
+    const interruptResponse = body.input.interruptResponse as HITLResponse;
     const config = {
       configurable: {
-        thread_id: body.input.threadId,
+        thread_id: threadId,
         rootPath: body.input.rootPath,
-        fileTree: body.input.fileTree,
       },
     };
+    if (threadId) {
+      const exists = await Thread.findOne({ threadId });
+
+      if (!exists) {
+        await Thread.insertOne({ threadId });
+      }
+    }
     const input = interruptResponse
       ? new Command({ resume: { decisions: interruptResponse.decisions } })
       : body.input;
 
-    const stream = await agent.stream(input, {
+    // let input;
+
+    // if (body.command?.resume) {
+    //   input = new Command({
+    //     resume: {
+    //       decisions: body.command.resume.decisions,
+    //     },
+    //   });
+    // } else {
+    //   input = body.input;
+    // }
+
+    // console.log("inputs", input);
+
+    const stream = await mainAgent.stream(input, {
       ...config,
       encoding: "text/event-stream",
       streamMode: [
-        "updates",
+        // "updates",
         "messages",
         "values",
         "checkpoints",
-        "tools",
+        // "tools",
         "custom",
       ],
-      // recursionLimit: 10,
+      recursionLimit: 25,
     });
 
     return new Response(stream, {

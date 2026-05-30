@@ -1,0 +1,13 @@
+{
+    "languageModel" : {
+        "model" : "gemma4:e2b",
+        "reasoning" : true,
+        "temperature" : 0,
+        "graphLanguageModel" : {
+            "model" : "gemma4:e2b",
+            "reasoning": false,
+            "temperature" : 0
+        }
+    }
+    
+}
