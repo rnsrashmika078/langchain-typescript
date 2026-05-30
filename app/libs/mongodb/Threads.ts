@@ -8,6 +8,6 @@ const ThreadSchema = new mongoose.Schema({
   },
 });
 
-const Thread = mongoose.models.Chat || mongoose.model("Thread", ThreadSchema);
+const Thread = mongoose.models.Thread || mongoose.model("Thread", ThreadSchema);
 ThreadSchema.index({ threadID: 1 });
 export default Thread;

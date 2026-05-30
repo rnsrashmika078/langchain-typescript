@@ -1,10 +1,11 @@
+import connectDB from "@/app/libs/mongodb/connectDB";
 import Thread from "@/app/libs/mongodb/Threads";
 import { NextResponse } from "next/server";
 
 export async function POST() {
   try {
-
     // no auth - > locl run
+    await connectDB();
     const allThreads = await Thread.find();
 
     if (allThreads.length === 0) {
@@ -16,6 +17,7 @@ export async function POST() {
         { status: 200 },
       );
     }
+
     return NextResponse.json(
       {
         data: allThreads,
