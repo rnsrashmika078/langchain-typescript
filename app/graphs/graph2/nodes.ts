@@ -2,12 +2,8 @@
 import { ConditionalEdgeRouter, GraphNode } from "@langchain/langgraph";
 import { graph2 } from "../schemas/graphSchema";
 import { graphLanguageModel } from "@/app/agents/languageModel";
-import {
-  CommandStructuredOutput,
-  PowerShellDocOutput,
-} from "../schemas/structuredOutputSchema";
+import { CommandStructuredOutput } from "../schemas/structuredOutputSchema";
 import { execFile } from "child_process";
-import { ReadDirectory } from "@/app/helper";
 
 // Node: => Find a path
 export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
@@ -15,7 +11,6 @@ export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
     config.writer({ message: "Requesting Powershell command..." });
   }
 
-  console.log("failed command", state.failedCommand);
   let prompt = "";
   if (state.error) {
     console.log("ERROR", state.error);
@@ -30,7 +25,7 @@ export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
 
   TASK: ${state.task}
   POWERSHELL DOCUMENTATION: ${state.powershellDoc}
-  PROJECT FILE TREE: ${JSON.stringify(state.fileTree)}
+  PROJECT FILE TREE: ${state.fileTree}
   ROOT DIRECTORY: ${state.rootDir}
 
   COMMAND PATH MUST BE ABSOLUTE PATH. DONT USE RELATIVE PATH AT ALL
@@ -55,9 +50,8 @@ export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
 
   TASK:${state.task}
   POWERSHELL DOCUMENTATION: ${state.powershellDoc}
-  PROJECT FILE TREE: ${JSON.stringify(state.fileTree)}
+  PROJECT FILE TREE: ${state.fileTree}
   CURRENT WORKING DIRECTORY: ${state.rootDir}
-  ROOT DIRECTORY: ${state.rootDir}
 
 
    Rules:
@@ -71,7 +65,6 @@ export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
     CommandStructuredOutput,
   );
   const result = await structuredLlm.invoke(prompt);
-  console.log("getCommand", result.command);
   return { command: result.command };
 };
 export const readPowershellDocs: GraphNode<typeof graph2> = async (
@@ -81,78 +74,6 @@ export const readPowershellDocs: GraphNode<typeof graph2> = async (
   if (config.writer) {
     config.writer({ message: "reading powershell docs..." });
   }
-
-  //   const md = `
-  // # Safe PowerShell Commands for AI Agent
-
-  // This document defines a **restricted safe command set** for AI systems that interact with the file system using PowerShell.
-
-  // #  1. File & Folder Listing (SAFE)
-
-  // #
-
-  // ## List all files and folders / find path / find directory
-  // Get-ChildItem
-
-  // ## Recursive listing
-  // Get-ChildItem -Recurse
-
-  // ## Only folders
-  // Get-ChildItem -Directory
-
-  // ## Only files
-  // Get-ChildItem -File
-
-  // ## Filter by extensions (useful for codebases)
-  // Get-ChildItem -Recurse -File -Include *.ts,*.tsx,*.js,*.jsx
-
-  // #  2. File Reading (SAFE)
-
-  // ## Read full file
-  // Get-Content "path\file.ts"
-
-  // ## Read first N lines
-  // Get-Content "path\file.ts" -TotalCount 50
-
-  // ## Stream file content
-  // Get-Content "path\file.ts" | ForEach-Object { $_ }
-
-  // # 3. Search Inside Files (VERY IMPORTANT)
-
-  // ## Search pattern in files
-  // Select-String -Path "*.ts" -Pattern "useState" -Recurse
-
-  // ## Search across entire project
-  // Get-ChildItem -Recurse -File | Select-String "console.log"
-  // ---
-
-  // #  4. Path Utilities (SAFE)
-
-  // ## Get current directory
-  // Get-Location
-
-  // ## Check if path exists
-  // Test-Path "path"
-
-  // ## Resolve full path
-  // Resolve-Path "path"
-
-  // # 5. BLOCKED COMMANDS (DO NOT ALLOW)
-
-  // - Remove-Item
-  // - rm
-  // - rmdir
-  // - del
-  // - Start-Process
-  // - Invoke-WebRequest
-  // - Set-Content
-  // - New-Item (unless explicitly allowed)
-
-  // - list_files → Get-ChildItem
-  // - read_file → Get-Content
-  // - search → Select-String
-
-  // `;
 
   const md = `
     POWERSHELL COMMAND DOCUMENTATION
@@ -176,42 +97,48 @@ export const readPowershellDocs: GraphNode<typeof graph2> = async (
           Get-ChildItem -Path "C:\\Users\\John\\OneDrive\\Desktop\\ReactProject" -Recurse -ErrorAction SilentlyContinue
 
 `;
-  // const prompt = `
-  // READ BELOW MARKDOWN FILE TO UNDERSTAND ABOUT POWERSHELL COMMANDS
 
-  // POWERSHELL COMMANDS DOCUMENTS: ${md}
-
-  // EXCLUDE THIS FOLDER: node_modules
-
-  // You MUST return ONLY valid JSON.
-
-  // Output format:
-  // {powershellDoc: string}
-
-  // Rules:
-  // - Only return JSON
-  // - Do NOT explain
-  // - Do NOT add extra text
-  // - Only use read-only commands unless explicitly allowed
-  // - Never delete or modify system files
-  // - Never execute external scripts or downloads
-  // - Always prefer Get-ChildItem + Get-Content + Select-String
-  // - Treat file system as read-only by default
-  // `;
-
-  // const structuredLlm =
-  //   graphLanguageModel.withStructuredOutput(PowerShellDocOutput);
-  // const result = await structuredLlm.invoke(prompt);
-  // console.log("getCommand", result.powershellDoc);
   return { powershellDoc: md };
 };
 export const readFileTree: GraphNode<typeof graph2> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Reading file tree...." });
   }
-  // const safeCwd = path.resolve(state.rootDir);
-  const result = await ReadDirectory(state.rootDir);
-  return { fileTree: result.tree };
+
+  const safeCommand = `Get-ChildItem -Path "${state.rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
+
+  console.log("safeCommand", safeCommand);
+  return new Promise((resolve) => {
+    execFile(
+      "powershell",
+      ["-Command", safeCommand],
+      { cwd: state.rootDir },
+      (error, stdout, stderr) => {
+        console.log("FILE TREE", stdout);
+        resolve({ fileTree: stdout });
+      },
+    );
+  });
+};
+export const readFilePath: GraphNode<typeof graph2> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Reading file paths...." });
+  }
+
+  const safeCommand = `Get-ChildItem -Path "${state.rootDir}" -Filter "${state.fileOrFolderName}" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
+
+  console.log("safeCommand", safeCommand);
+  return new Promise((resolve) => {
+    execFile(
+      "powershell",
+      ["-Command", safeCommand],
+      { cwd: state.rootDir },
+      (error, stdout, stderr) => {
+        console.log("FILE PATH", stdout);
+        resolve({ fileTree: stdout });
+      },
+    );
+  });
 };
 export const isError: ConditionalEdgeRouter<typeof graph2> = (
   state,
@@ -246,23 +173,33 @@ export const isReadFileTree: ConditionalEdgeRouter<typeof graph2> = (
   if (state.fileTree) return "Yes";
   return "No";
 };
+export const isLoopDone: ConditionalEdgeRouter<typeof graph2> = (
+  state,
+  config,
+) => {
+  if (config.writer) {
+    config.writer({ message: "Checking next task..." });
+  }
+
+  if (state.fileTree) return "Yes";
+  return "No";
+};
 export const runCommand: GraphNode<typeof graph2> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Running Powershell command..." });
   }
 
   let safeCommand = state.command;
+  console.log("FILE TREEEE: ", state.fileTree);
 
-  if (
-    state.command.includes("Get-ChildItem") ||
-    state.command.includes("ls") ||
-    state.command.includes("dir")
-  ) {
-    safeCommand = `
-  ${state.command} | Where-Object { $_.FullName -notmatch "node_modules" }
-  `;
+  const hasGetChildItem =
+    safeCommand.includes("Get-ChildItem") ||
+    safeCommand.includes("ls") ||
+    safeCommand.includes("dir");
+
+  if (hasGetChildItem) {
+    safeCommand += ' | Where-Object { $_.FullName -notmatch "node_modules" }';
   }
-  console.log("command", safeCommand);
 
   try {
     return new Promise((resolve) => {
@@ -295,7 +232,7 @@ export const runCommand: GraphNode<typeof graph2> = async (state, config) => {
             });
 
           resolve({
-            result: stdout || "Command Execute Silently.",
+            result: stdout || "required file or project not found!",
             error: error || stderr ? error || (stderr as any) : undefined,
             failedCommand: error
               ? [
@@ -312,7 +249,7 @@ export const runCommand: GraphNode<typeof graph2> = async (state, config) => {
       console.log("error", state.error);
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unkown error ";
+    const message = err instanceof Error ? err.message : "unknown error ";
     return { error: message };
   }
 };

@@ -1,18 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { requestWeatherAPI } from "@/app/helper";
-import { mkdirSync, writeFileSync } from "fs";
+import {
+  requestWeatherAPI,
+  findProjectRoot,
+  asyncExecPowerShell,
+} from "@/app/helper";
 import { tool, ToolRuntime } from "langchain";
-import path from "path";
 import * as z from "zod";
-import { exec } from "child_process";
-import { cwd } from "process";
-import { run_langgraph } from "../graphs/graph2/powershellCommand";
-
-const getWeather = tool(
+import { fileSystemTool } from "../graphs/graph2/fileSystemGraph";
+import { subAgentTaskTool } from "../sub_agent/subAgentTaskTool";
+export const getWeather = tool(
   async (
     {
       city,
-      country,
     }: {
       city: string;
       country: string;
@@ -50,7 +49,6 @@ const getWeather = tool(
     }),
   },
 );
-
 const getCurrentTime = tool(
   () => {
     return `current time: ${new Date().toLocaleTimeString()}`;
@@ -72,59 +70,118 @@ const generateCode = tool(
     }),
   },
 );
-const createFile = tool(
-  async ({ filePath, content }: { filePath: string; content: string }) => {
-    try {
-      const dir = path.dirname(filePath);
-      console.log("dir", dir);
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(filePath, content);
 
-      return `file created successfully with filePath: ${filePath}`;
+const getFileORFolderPath = tool(
+  async (runtime: ToolRuntime) => {
+    try {
+      // const dir = path.dirname(filePath);
+      // mkdirSync(dir, { recursive: true });
+      // writeFileSync(filePath, content);
+      const rootDir = runtime?.configurable?.rootPath;
+
+      console.log("rood dir", rootDir);
+      if (!rootDir) {
+        return "no project found!";
+      }
+      const filePath = `Get-ChildItem -Path ${rootDir} -Filter "Welcome.tsx" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
+      const result = await asyncExecPowerShell(filePath, rootDir);
+      return result;
     } catch (e) {
       return `${e instanceof Error ? e.message : "Error while create file"}`;
     }
   },
   {
-    name: "create_file",
-    description:
-      "create file in suitable directory with generated_code tool result",
+    name: "getFileORFolderPath",
+    description: "get absolute file/folder path",
+    // schema: z.object({
+    //   filePath: z.string().describe("absolute file path"),
+    //   content: z.string(),
+    // }),
+  },
+);
+export const generalShellTool = tool(
+  async ({ command }: { command: string }, runtime: ToolRuntime) => {
+    const rootPath = runtime?.configurable?.rootPath;
+    let modifiedCommand = "";
+
+    // if (runtime.writer) {
+    //   runtime.writer({ message: "Scanning the project explore..." });
+    // }
+
+    if (!rootPath)
+      return "You have currently doesn`t open any project, so you can't run shell commands that interact with file system.";
+
+    const projectRelativePath = findProjectRoot(rootPath);
+    console.log("projectRelativePath", projectRelativePath);
+
+    if (
+      command.includes("npm run dev") ||
+      command.includes("bun run dev") ||
+      command.includes("bun dev")
+    ) {
+      const mainCommand = command.includes(" && ")
+        ? command.split(" && ")[1]
+        : command;
+      modifiedCommand = `cd ${projectRelativePath}; if ($?) { ${mainCommand} }`;
+      // if (runtime.writer) {
+      //   runtime.writer({ message: "Executing powershell command..." });
+      // }
+
+      return {
+        success: true,
+        message:
+          "React Vite app is running in development mode. You can access it in your browser at http://localhost:5174",
+        command: modifiedCommand,
+      };
+    }
+
+    if (command.includes("npm install") || command.includes("bun install")) {
+      const mainCommand = command.includes(" && ")
+        ? command.split(" && ")[1]
+        : command;
+      modifiedCommand = `cd ${projectRelativePath}; if ($?) { ${mainCommand} }`;
+      const result = await asyncExecPowerShell(modifiedCommand, rootPath);
+
+      return result;
+    }
+
+    if (command.includes("cd")) {
+      modifiedCommand = command.replace(command, `cd ${projectRelativePath}`);
+      const result = await asyncExecPowerShell(modifiedCommand, rootPath);
+      return result;
+    }
+    const result = await asyncExecPowerShell(command, rootPath);
+    return result;
+  },
+  {
+    name: "generalShellTool",
+    description: `
+Run non-interactive PowerShell commands in the current project directory.
+
+Package manger : npm only. no bun or yarn.
+
+Used for:
+- Node.js / npm / npx commands 
+- Running dev/build/test scripts
+- File system checks
+- Environment/system info
+
+Rules:
+- Run ONLY ONE command per tool call
+- Do NOT chain commands (no && or ;)
+- Split multiple actions into separate calls
+- Avoid interactive commands (like npm init, vim)
+
+Output:
+- Return stdout if available
+- Return error message if failed
+- If no output, return success message
+`,
     schema: z.object({
-      filePath: z.string(),
-      content: z.string(),
+      command: z.string(),
     }),
   },
 );
-
-// const executePowerShellCommands = tool(
-//   async ({ command }: { command: string }, runtime: ToolRuntime) => {
-//     const rootPath = runtime?.configurable?.rootPath;
-//     const safeCommand = `
-//     ${command} | Where-Object { $_.FullName -notmatch "node_modules" }
-//     `;
-
-//     const modified = safeCommand.replace("-Path" , `-Path "${rootPath}" `)
-//     return new Promise((resolve) => {
-//       exec(
-//         `powershell -Command "${modified}"`,
-//         { cwd: rootPath },
-//         (error, stdout, stderr) => {
-//           if (error) return resolve(error.message);
-//           if (stderr) return resolve(stderr);
-//           resolve(stdout);
-//         },
-//       );
-//     });
-//   },
-//   {
-//     name: "executePowerShellCommands",
-//     description:
-//       "run POWERSHELL commands only..ALWAYS EXCLUDE 'node_modules' folder",
-//     schema: z.object({
-//       command: z.string(),
-//     }),
-//   },
-// );
 
 export const modelTools = [
   // getWeather,
@@ -132,6 +189,12 @@ export const modelTools = [
   // generateCode,
   // createFile,
   // run_langgraph,
-  // executePowerShellCommands,
-  run_langgraph
+  // runReactApp,
+  generalShellTool,
+  // createViteProject,
+  fileSystemTool,
+  subAgentTaskTool,
+  // updateFile,
+  getFileORFolderPath,
+  // TestGraph
 ];

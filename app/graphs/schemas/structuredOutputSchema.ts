@@ -23,6 +23,7 @@ export const FileContentStructuredOutput = z.object({
 export const CommandStructuredOutput = z.object({
   command: z.string().describe("POWERSHELL COMMAND"),
 });
+
 // Schema for structured output -> powershell docs ( graph2 )
 export const PowerShellDocOutput = z.object({
   powershellDoc: z.string().describe("POWERSHELL DOCUMENTATION"),

@@ -1,17 +1,20 @@
 export default function Home() {
-  const command =
-    'Get-ChildItem -Path "C:\Users\Rashm\OneDrive\Desktop\sandbox" -Filter "src" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }';
+  const image = "./public/id.jpeg";
+  const actPath = "C:\\Users\\Rashm\\OneDrive\\Desktop\\Sanbox3\\Test01";
+  const path =
+    "cd C:\\Users\\Rashm\\OneDrive\\Desktop\\Sanbox3\\Test01 && cd Test01 && npm run dev";
+  const command = "cd Test01 && npm run dev";
 
-  const wrongCommand =
-    'Get-ChildItem -Path \"C:\Users\Rashm\OneDrive\Desktop\sandbox\" -Filter \"src\" -Recurse -ErrorAction SilentlyContinue';
+  const modifiedCommand = command.includes(" && ")
+    ? command
+        .split(" && ")[0]
+        .replace(command.split(" && ")[0], "cd " + actPath) +
+      " && " +
+      command.split(" && ")[1]
+    : command;
   return (
-    <pre className="text-xs">
-      {wrongCommand.split(" ").map((s, idx) => {
-        const modified = idx === 2 && s.charAt(0).replace("\\", "").charAt(s.length-1).replace("\\", "")
-
-        return <div key={idx}>{s}</div>
-      })}
-      {wrongCommand}
+    <pre className="text-xs items-center justify-center flex h-screen">
+      {modifiedCommand}
     </pre>
   );
 }

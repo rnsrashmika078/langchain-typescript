@@ -1,10 +1,15 @@
 import { createAgent, humanInTheLoopMiddleware, trimMessages } from "langchain";
 import { getCheckpointer } from "../memory/mongoDbSaver";
 import { mainAgentSystemPrompt } from "../data";
-import { languageModel } from "./languageModel";
-import { modelTools } from "../tools/primaryTools";
+import { graphLanguageModel, languageModel } from "./languageModel";
+import {
+  generalShellTool,
+  getWeather,
+  modelTools,
+} from "../tools/primaryTools";
 import { createDeepAgent, FilesystemBackend } from "deepagents";
 import { AgentState } from "../agent_middleware";
+import z from "zod";
 const checkpointer = await getCheckpointer();
 // Main agent
 export const mainAgent = createAgent({
@@ -18,7 +23,7 @@ export const mainAgent = createAgent({
       interruptOn: {
         // create_file: {
         //   allowedDecisions: ["approve", "reject"],
-        //   description: "🚨 Create file execution requires User approval",
+        //   description: "Create file execution requires User approval",
         // },
         // get_weather: {
         //   allowedDecisions: ["approve", "reject"],
@@ -28,10 +33,24 @@ export const mainAgent = createAgent({
         //   allowedDecisions: ["approve", "reject"],
         //   description: "Do you want to run ?",
         // },
-        run_langgraph: {
+        // fileSystemTool: {
+        //   allowedDecisions: ["approve", "reject"],
+        //   description: "Do you want to run graph?",
+        // },
+        fileSystemTool: false,
+        // generalShellTool: {
+        //   allowedDecisions: ["approve", "reject"],
+        //   description: "Do you want to run the command?",
+        // },
+        generalShellTool: true,
+        readFileTree: {
           allowedDecisions: ["approve", "reject"],
-          description: "Do you want to run graph?",
+          description: "Do you want to run PowerShell Command?",
         },
+        // runReactApp: {
+        //   allowedDecisions: ["approve", "reject"],
+        //   description: "Do you want to run application?",
+        // },
         // executePowerShellCommands: {
         //   allowedDecisions: ["approve", "reject"],
         //   description: "Do you want to run shell command",
@@ -42,12 +61,36 @@ export const mainAgent = createAgent({
   checkpointer: checkpointer,
 });
 
-export const deepAgent = createDeepAgent({
-  model: languageModel,
-  systemPrompt: "YOU ARE AN AI AGENT. AlWAYS RUN TOOLS",
-  tools: modelTools,
-  backend: new FilesystemBackend({
-    rootDir: "C:\\Users\\Rashm\\OneDrive\\Desktop\\sandbox",
-    virtualMode: false,
-  }),
+const weatherSchema = z.object({
+  temperature: z.number(),
+  condition: z.string(),
 });
+export const subAgent = createAgent({
+  model: graphLanguageModel,
+  systemPrompt:
+    "You are help full coding assistant. USE getWeather tool to get the weather data",
+  tools: [getWeather],
+  responseFormat: weatherSchema,
+  middleware: [
+    trimMessages,
+    humanInTheLoopMiddleware({
+      interruptOn: {
+        get_weather: {
+          allowedDecisions: ["approve", "reject"],
+          description: "To get weather we need User approval ?",
+        },
+      },
+    }),
+  ],
+  // checkpointer: checkpointer,
+});
+
+// export const deepAgent = createDeepAgent({
+//   model: languageModel,
+//   systemPrompt: "YOU ARE AN AI AGENT. AlWAYS RUN TOOLS",
+//   tools: modelTools,
+//   backend: new FilesystemBackend({
+//     rootDir: "C:\\Users\\Rashm\\OneDrive\\Desktop\\sandbox",
+//     virtualMode: false,
+//   }),
+// });

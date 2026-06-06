@@ -9,5 +9,5 @@ const ThreadSchema = new mongoose.Schema({
 });
 
 const Thread = mongoose.models.Thread || mongoose.model("Thread", ThreadSchema);
-ThreadSchema.index({ threadID: 1 });
+ThreadSchema.index({ threadId: 1 });
 export default Thread;

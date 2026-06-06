@@ -11,7 +11,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     console.log("BODY", body);
     const threadId = body.input.threadId;
-
     const interruptResponse = body.input.interruptResponse as HITLResponse;
     const config = {
       configurable: {
@@ -30,29 +29,16 @@ export async function POST(req: Request) {
       ? new Command({ resume: { decisions: interruptResponse.decisions } })
       : body.input;
 
-    // let input;
-
-    // if (body.command?.resume) {
-    //   input = new Command({
-    //     resume: {
-    //       decisions: body.command.resume.decisions,
-    //     },
-    //   });
-    // } else {
-    //   input = body.input;
-    // }
-
-    // console.log("inputs", input);
 
     const stream = await mainAgent.stream(input, {
       ...config,
       encoding: "text/event-stream",
       streamMode: [
-        // "updates",
+        "updates",
         "messages",
         "values",
         "checkpoints",
-        // "tools",
+        "tools",
         "custom",
       ],
       recursionLimit: 25,
