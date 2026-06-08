@@ -11,13 +11,14 @@ import {
 import { graph2 } from "../schemas/graphSchema";
 import {
   getCommand,
-  isError,
   readFilePath,
   readFileTree,
   readPowershellDocs,
-  runCommand,
 } from "./nodes";
 import { graphLanguageModel } from "@/app/agents/languageModel";
+import { generateFileResources } from "../graph1/nodes";
+// import { getCheckpointer } from "@/app/memory/mongoDbSaver";
+// const checkpointer = await getCheckpointer();
 const routeSchema = z.object({
   step: z
     .enum(["first", "second", "third"])
@@ -39,13 +40,13 @@ You MUST return ONLY valid JSON.
 Do NOT return plain text.
 
 Format:
-{ "step": "first" } OR { "step": "second" } OR { "step": "third" }
+{ "step": "first" } OR { "step": "second" } OR { "step": "third" } OR {"step" : "fourth"}
 
 
 Rules:
 - If the task is about a specific file (e.g., README.md, Welcome.tsx, file content, file path) → second
 - If the task is about folder structure, listing files, searching files → first
-- If unrelated → third
+- If the task is about Create file/folder → third
 `;
   const decision = await router.invoke([
     {
@@ -63,13 +64,15 @@ Rules:
 const routeDecision: ConditionalEdgeRouter<typeof graph2, any> = (state) => {
   // Return the node name you want to visit next
   if (state.decision === "first") {
-    return "llmCall1";
+    return "read_file_tree";
   } else if (state.decision === "second") {
-    return "llmCall2";
+    return "read_file_path";
+  } else if (state.decision === "third") {
+    return "create_file_init";
   } else {
-    return "llmCall3";
   }
 };
+
 export const fileSystemTool = tool(
   async (
     { task, fileOrFolderName }: { task: string; fileOrFolderName: string },
@@ -77,46 +80,44 @@ export const fileSystemTool = tool(
   ) => {
     const rootDir = runtime?.configurable?.rootPath;
     const graph = new StateGraph(graph2)
+
+      // Route A
       .addNode("read_file_tree", readFileTree)
+
+      // Route B
       .addNode("read_file_path", readFilePath)
+
       .addNode("get_command", getCommand)
-      .addNode("run_command", runCommand)
+
+      // Route C
+      .addNode("create_file_init", readFileTree)
+      .addNode("generateFileResources", generateFileResources)
+      // .addNode("generate_content", generateFileContent)
+
+      // common
       .addNode("read_powershell_docs", readPowershellDocs)
       .addNode("llmCallRouter", llmCallRouter)
-      .addNode("llmCall1", async (state) => state)
-      .addNode("llmCall2", async (state) => state)
-      .addNode("llmCall3", async (state) => state)
-      .addEdge(START, "llmCallRouter")
-      .addConditionalEdges("llmCallRouter", routeDecision, [
-        "llmCall1",
-        "llmCall2",
-        "llmCall3",
-      ])
-      //folder path route
-      .addEdge("llmCall1", "read_file_tree")
-      .addEdge("read_file_tree", "read_powershell_docs")
 
-      //file path route
-      .addEdge("llmCall2", "read_file_path")
+      //start
+      .addEdge(START, "llmCallRouter")
+
+      // conditional
+      .addConditionalEdges("llmCallRouter", routeDecision, [
+        "read_file_tree",
+        "read_file_path",
+        "create_file_init",
+      ])
+
+      // End file create path
+      .addEdge("create_file_init", "generateFileResources")
+      .addEdge("generateFileResources", END)
+
+      //folder path route
+      .addEdge("read_file_tree", "read_powershell_docs")
       .addEdge("read_file_path", "read_powershell_docs")
       .addEdge("read_powershell_docs", "get_command")
-      .addEdge("get_command", "run_command")
-      .addConditionalEdges("run_command", isError, {
-        Continue: "get_command",
-        Done: END,
-      })
-      .addEdge("llmCall3", END)
-      // .addEdge(START, "read_file_tree")
-      // // .addConditionalEdges("read_file_tree", isReadDocs, {
-      // //   Yes: "get_command",
-      // //   No: "read_powershell_docs",
-      // // })
-      // .addEdge("read_powershell_docs", "get_command")
-      // .addEdge("get_command", "run_command")
-      // .addConditionalEdges("run_command", isError, {
-      //   Continue: "get_command",
-      //   Done: END,
-      // })
+      .addEdge("get_command", END)
+
       .compile();
 
     const inputs = {
@@ -125,8 +126,8 @@ export const fileSystemTool = tool(
       fileOrFolderName,
     };
 
-    let full_state: any = null;
-    let custom: any = null;
+    let full_state: any = "";
+    let custom: any = "";
 
     for await (const [mode, chunk] of await graph.stream(inputs, {
       streamMode: ["values", "custom"],
@@ -140,8 +141,7 @@ export const fileSystemTool = tool(
         }
       }
     }
-
-    return full_state.result;
+    return full_state.command;
   },
   {
     name: "fileSystemTool",
@@ -160,7 +160,7 @@ export const fileSystemTool = tool(
       - Do NOT assume file system state — always fetch fresh data.
 
       Output:
-      - Return final computed result only
+      - the powershell command that need to run using generalShellTool
       `,
     schema: z.object({
       task: z.string().describe(
@@ -171,7 +171,7 @@ export const fileSystemTool = tool(
           - "Get the content of README.md in the project root."
           - "Run a PowerShell command to list all processes related to node."`,
       ),
-      fileOrFolderName: z.optional(z.string()).describe("file /folder name"),
+      fileOrFolderName: z.string().describe("file /folder name"),
     }),
   },
 );

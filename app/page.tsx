@@ -1,20 +1,52 @@
+"use client";
+import { useMemo } from "react";
+import {
+  FetchStreamTransport,
+  useStream,
+} from "@langchain/langgraph-sdk/react";
 export default function Home() {
-  const image = "./public/id.jpeg";
-  const actPath = "C:\\Users\\Rashm\\OneDrive\\Desktop\\Sanbox3\\Test01";
-  const path =
-    "cd C:\\Users\\Rashm\\OneDrive\\Desktop\\Sanbox3\\Test01 && cd Test01 && npm run dev";
-  const command = "cd Test01 && npm run dev";
+  const transport = useMemo(() => {
+    return new FetchStreamTransport({
+      // apiUrl: "http://localhost:3000/api/chat",
+      apiUrl: "http://localhost:3000/api/chat",
+      // apiUrl: "http://localhost:2024",
+      // assistantId: "agent",
+    });
+  }, []);
 
-  const modifiedCommand = command.includes(" && ")
-    ? command
-        .split(" && ")[0]
-        .replace(command.split(" && ")[0], "cd " + actPath) +
-      " && " +
-      command.split(" && ")[1]
-    : command;
+  const stream = useStream({
+    transport,
+  });
+
+  const handleSubmit = async (content: string) => {
+    await stream.submit(
+      {
+        messages: [{ content, role: "human" }],
+        threadId: "chat123",
+      },
+      {
+        config: {
+          configurable: { thread_id: "chat123" },
+        },
+      },
+    );
+  };
+  console.log("messages", stream.messages);
   return (
     <pre className="text-xs items-center justify-center flex h-screen">
-      {modifiedCommand}
+      {stream.messages.map((msg) => (
+        <div key={msg.id}>{JSON.stringify(msg)}</div>
+      ))}
+      <input
+        className="border p-5"
+        type="text"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            const content = e.currentTarget.value;
+            handleSubmit(content);
+          }
+        }}
+      ></input>
     </pre>
   );
 }

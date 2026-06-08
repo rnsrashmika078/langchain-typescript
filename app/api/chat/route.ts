@@ -4,32 +4,27 @@ import { Command } from "@langchain/langgraph";
 import { mainAgent } from "@/app/agents/agent";
 import connectDB from "@/app/libs/mongodb/connectDB";
 import Thread from "@/app/libs/mongodb/Threads";
+import { prisma } from "@/app/libs/mongodb/prismaClient";
+import { prismaUpsert } from "@/app/helper";
 
 export async function POST(req: Request) {
   try {
-    await connectDB();
     const body = await req.json();
     console.log("BODY", body);
-    const threadId = body.input.threadId;
+    const thread_id = body.input.threadId;
     const interruptResponse = body.input.interruptResponse as HITLResponse;
     const config = {
       configurable: {
-        thread_id: threadId,
+        thread_id,
         rootPath: body.input.rootPath,
       },
     };
-    if (threadId) {
-      const exists = await Thread.findOne({ threadId });
-
-      if (!exists) {
-        await Thread.insertOne({ threadId });
-      }
-    }
+    await prismaUpsert(thread_id);
     const input = interruptResponse
       ? new Command({ resume: { decisions: interruptResponse.decisions } })
       : body.input;
 
-
+    // const mainAgent = await getMainAgent();
     const stream = await mainAgent.stream(input, {
       ...config,
       encoding: "text/event-stream",

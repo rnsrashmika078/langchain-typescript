@@ -1,48 +1,37 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { exec } from "child_process";
 import { NextResponse } from "next/server";
-
+import * as z from "zod";
+import { createDeepAgent } from "deepagents";
+import { tool } from "langchain";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { task } = body;
+    // const { prompt } = body;
 
-    if (!task) {
-      return NextResponse.json({ error: "task is required" }, { status: 400 });
-    }
+    // if (!prompt) {
+    //   return NextResponse.json({ error: "task is required" }, { status: 400 });
+    // }
+    const getWeather = tool(({ city }) => `It's always sunny in ${city}!`, {
+      name: "get_weather",
+      description: "Get the weather for a given city",
+      schema: z.object({
+        city: z.string(),
+      }),
+    });
 
-    const path = "C:\\Users\\Rashm\\OneDrive\\Desktop\\sandbox\\New folder";
+    const agent = createDeepAgent({
+      tools: [getWeather],
+      systemPrompt: "You are a helpful assistant",
+    });
 
-    exec(
-      `powershell -Command "Get-ChildItem -Force`,
-      { cwd: path },
-      (error, stdout, stderr) => {
-        if (error) {
-          console.log(error.message);
-          return error;
-        }
-
-        if (stderr) {
-          console.log(stderr);
-          return NextResponse.json({
-            success: true,
-            result: stdout,
-            message: "command started",
-          });
-        }
-
-        console.log("stdout", stdout);
-        return NextResponse.json({
-          success: true,
-          result: stdout,
-          message: "command started",
-        });
-      },
+    console.log(
+      await agent.invoke({
+        messages: [{ role: "user", content: "What's the weather in Tokyo?" }],
+      }),
     );
-
     return NextResponse.json({
       success: true,
-      message: "command started",
+      message: "done!",
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -54,3 +43,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export const runtime = "nodejs";

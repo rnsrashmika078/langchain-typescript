@@ -5,6 +5,7 @@ import { v4 as uuid } from "uuid";
 import path from "path";
 import fs from "fs";
 import { execFile, execFileSync, spawn } from "child_process";
+import { prisma } from "./libs/prisma/prismaClient";
 
 export const requestWeatherAPI = async (city: string) => {
   try {
@@ -20,7 +21,6 @@ export const requestWeatherAPI = async (city: string) => {
   }
 };
 export const ReadDirectory = (path: string) => {
-  console.log("Path dir from Read Dir", path);
   function Recursion(path: string): unknown {
     const project = readdirSync(path).map((name) => {
       const filePath = join(path, name);
@@ -115,4 +115,22 @@ export function runPowerShellStream(
   });
 
   return child;
+}
+
+export async function prismaUpsert(thread_id: string) {
+  try {
+    if (thread_id) {
+      await prisma.threads.upsert({
+        where: {
+          thread_id,
+        },
+        update: {},
+        create: {
+          thread_id,
+        },
+      });
+    }
+  } catch (err) {
+    console.log(err);
+  }
 }

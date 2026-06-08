@@ -1,60 +1,40 @@
 import { createAgent, humanInTheLoopMiddleware, trimMessages } from "langchain";
-import { getCheckpointer } from "../memory/mongoDbSaver";
+import {
+  getPostgressCheckpointer,
+} from "../memory/memorySavers";
 import { mainAgentSystemPrompt } from "../data";
 import { graphLanguageModel, languageModel } from "./languageModel";
-import {
-  generalShellTool,
-  getWeather,
-  modelTools,
-} from "../tools/primaryTools";
-import { createDeepAgent, FilesystemBackend } from "deepagents";
+import { getWeather, modelTools } from "../tools/primaryTools";
 import { AgentState } from "../agent_middleware";
 import z from "zod";
-const checkpointer = await getCheckpointer();
-// Main agent
+// import { checkpointer, getCheckpointer, InLineMemory } from "../memory/mongoDbSaver";
+// const checkpointer = await getRedisCheckpointer();
+// const checkpointer = await getRedisCheckpointer();
+const checkpointer = await getPostgressCheckpointer();
 export const mainAgent = createAgent({
   model: languageModel,
   systemPrompt: mainAgentSystemPrompt,
   tools: modelTools,
-  stateSchema: AgentState,
+  // stateSchema: AgentState,
   middleware: [
-    trimMessages,
     humanInTheLoopMiddleware({
       interruptOn: {
-        // create_file: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "Create file execution requires User approval",
-        // },
-        // get_weather: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "To get weather we need User approval ?",
-        // },
-        // run_langgraph: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "Do you want to run ?",
-        // },
-        // fileSystemTool: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "Do you want to run graph?",
-        // },
-        fileSystemTool: false,
-        // generalShellTool: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "Do you want to run the command?",
-        // },
-        generalShellTool: true,
-        readFileTree: {
+        generalShellTool: {
           allowedDecisions: ["approve", "reject"],
-          description: "Do you want to run PowerShell Command?",
+          description: "Execute this command?",
         },
-        // runReactApp: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "Do you want to run application?",
-        // },
-        // executePowerShellCommands: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "Do you want to run shell command",
-        // },
+        fileSystemTool: {
+          allowedDecisions: ["approve", "reject"],
+          description: "Execute this command?",
+        },
+        fileOperationTool: {
+          allowedDecisions: ["approve", "reject"],
+          description: "Execute this command?",
+        },
+        getWeather: {
+          allowedDecisions: ["approve", "reject"],
+          description: "Execute this command?",
+        },
       },
     }),
   ],

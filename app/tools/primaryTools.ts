@@ -7,14 +7,12 @@ import {
 import { tool, ToolRuntime } from "langchain";
 import * as z from "zod";
 import { fileSystemTool } from "../graphs/graph2/fileSystemGraph";
-import { subAgentTaskTool } from "../sub_agent/subAgentTaskTool";
 export const getWeather = tool(
   async (
     {
       city,
     }: {
       city: string;
-      country: string;
     },
     config: ToolRuntime,
   ) => {
@@ -45,62 +43,23 @@ export const getWeather = tool(
     description: "Get weather",
     schema: z.object({
       city: z.string(),
-      country: z.string(),
-    }),
-  },
-);
-const getCurrentTime = tool(
-  () => {
-    return `current time: ${new Date().toLocaleTimeString()}`;
-  },
-  {
-    name: "return_current_time",
-    description: "return current local time",
-  },
-);
-const generateCode = tool(
-  ({ code }: { code: string }) => {
-    return `code: ${code}`;
-  },
-  {
-    name: "generate_code",
-    description: "generate user ask code using programing language",
-    schema: z.object({
-      code: z.string(),
     }),
   },
 );
 
-const getFileORFolderPath = tool(
-  async (runtime: ToolRuntime) => {
-    try {
-      // const dir = path.dirname(filePath);
-      // mkdirSync(dir, { recursive: true });
-      // writeFileSync(filePath, content);
-      const rootDir = runtime?.configurable?.rootPath;
-
-      console.log("rood dir", rootDir);
-      if (!rootDir) {
-        return "no project found!";
-      }
-      const filePath = `Get-ChildItem -Path ${rootDir} -Filter "Welcome.tsx" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
-      const result = await asyncExecPowerShell(filePath, rootDir);
-      return result;
-    } catch (e) {
-      return `${e instanceof Error ? e.message : "Error while create file"}`;
-    }
-  },
-  {
-    name: "getFileORFolderPath",
-    description: "get absolute file/folder path",
-    // schema: z.object({
-    //   filePath: z.string().describe("absolute file path"),
-    //   content: z.string(),
-    // }),
-  },
-);
 export const generalShellTool = tool(
-  async ({ command }: { command: string }, runtime: ToolRuntime) => {
+  async (
+    {
+      command,
+      // purpose,
+      // path,
+    }: {
+      command: string;
+      // purpose: "install" | "run" | "check" | "info" | "create";
+      // path: string;
+    },
+    runtime: ToolRuntime,
+  ) => {
     const rootPath = runtime?.configurable?.rootPath;
     let modifiedCommand = "";
 
@@ -112,7 +71,6 @@ export const generalShellTool = tool(
       return "You have currently doesn`t open any project, so you can't run shell commands that interact with file system.";
 
     const projectRelativePath = findProjectRoot(rootPath);
-    console.log("projectRelativePath", projectRelativePath);
 
     if (
       command.includes("npm run dev") ||
@@ -150,6 +108,9 @@ export const generalShellTool = tool(
       const result = await asyncExecPowerShell(modifiedCommand, rootPath);
       return result;
     }
+
+    // if (purpose === "create") {
+    // }
     const result = await asyncExecPowerShell(command, rootPath);
     return result;
   },
@@ -183,18 +144,4 @@ Output:
   },
 );
 
-export const modelTools = [
-  // getWeather,
-  // getCurrentTime,
-  // generateCode,
-  // createFile,
-  // run_langgraph,
-  // runReactApp,
-  generalShellTool,
-  // createViteProject,
-  fileSystemTool,
-  subAgentTaskTool,
-  // updateFile,
-  getFileORFolderPath,
-  // TestGraph
-];
+export const modelTools = [getWeather, generalShellTool, fileSystemTool];

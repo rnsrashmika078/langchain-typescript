@@ -20,7 +20,7 @@ export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
   You MUST return ONLY valid JSON.
 
   Output format:
-  {"command": "string"}
+{"command": "string"}
 
 
   TASK: ${state.task}
@@ -46,7 +46,7 @@ export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
   You MUST return ONLY valid JSON.
 
   Output format:
-  {command: string}
+{"command": "string"}
 
   TASK:${state.task}
   POWERSHELL DOCUMENTATION: ${state.powershellDoc}
@@ -107,14 +107,12 @@ export const readFileTree: GraphNode<typeof graph2> = async (state, config) => {
 
   const safeCommand = `Get-ChildItem -Path "${state.rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
 
-  console.log("safeCommand", safeCommand);
   return new Promise((resolve) => {
     execFile(
       "powershell",
       ["-Command", safeCommand],
       { cwd: state.rootDir },
       (error, stdout, stderr) => {
-        console.log("FILE TREE", stdout);
         resolve({ fileTree: stdout });
       },
     );
@@ -127,14 +125,12 @@ export const readFilePath: GraphNode<typeof graph2> = async (state, config) => {
 
   const safeCommand = `Get-ChildItem -Path "${state.rootDir}" -Filter "${state.fileOrFolderName}" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
 
-  console.log("safeCommand", safeCommand);
   return new Promise((resolve) => {
     execFile(
       "powershell",
       ["-Command", safeCommand],
       { cwd: state.rootDir },
       (error, stdout, stderr) => {
-        console.log("FILE PATH", stdout);
         resolve({ fileTree: stdout });
       },
     );
@@ -190,7 +186,6 @@ export const runCommand: GraphNode<typeof graph2> = async (state, config) => {
   }
 
   let safeCommand = state.command;
-  console.log("FILE TREEEE: ", state.fileTree);
 
   const hasGetChildItem =
     safeCommand.includes("Get-ChildItem") ||

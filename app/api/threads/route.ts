@@ -1,12 +1,11 @@
 import connectDB from "@/app/libs/mongodb/connectDB";
 import Thread from "@/app/libs/mongodb/Threads";
+import { prisma } from "@/app/libs/prisma/prismaClient";
 import { NextResponse } from "next/server";
 
 export async function POST() {
   try {
-    // no auth - > locl run
-    await connectDB();
-    const allThreads = await Thread.find();
+    const allThreads = await prisma.threads.findMany();
 
     if (allThreads.length === 0) {
       return NextResponse.json(

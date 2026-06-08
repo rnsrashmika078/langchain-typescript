@@ -1,3 +1,4 @@
+import { Content } from "next/font/google";
 import z from "zod";
 
 // Schema for structured output -> file path
@@ -22,6 +23,15 @@ export const FileContentStructuredOutput = z.object({
 // Schema for structured output -> command executer ( graph2 )
 export const CommandStructuredOutput = z.object({
   command: z.string().describe("POWERSHELL COMMAND"),
+});
+export const createFileStructureOutput = z.object({
+  absoluteFilePath: z.string().describe("POWERSHELL COMMAND"),
+  content: z.string().describe("file content"),
+});
+export const contentFileStructuredOutput = z.object({
+  content: z
+    .string()
+    .describe("content to the file based on the task; e.g.React code"),
 });
 
 // Schema for structured output -> powershell docs ( graph2 )
