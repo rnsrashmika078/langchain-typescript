@@ -1,6 +1,4 @@
-import { Content } from "next/font/google";
 import z from "zod";
-
 // Schema for structured output -> file path
 export const FilePathStructuredOutput = z.object({
   absolute_path: z
@@ -23,6 +21,9 @@ export const FileContentStructuredOutput = z.object({
 // Schema for structured output -> command executer ( graph2 )
 export const CommandStructuredOutput = z.object({
   command: z.string().describe("POWERSHELL COMMAND"),
+});
+export const reactCodeErrorFixedOutput = z.object({
+  fixed_code: z.string().describe("fixed, error free code"),
 });
 export const createFileStructureOutput = z.object({
   absoluteFilePath: z.string().describe("POWERSHELL COMMAND"),

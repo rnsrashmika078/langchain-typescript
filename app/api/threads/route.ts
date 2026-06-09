@@ -1,5 +1,3 @@
-import connectDB from "@/app/libs/mongodb/connectDB";
-import Thread from "@/app/libs/mongodb/Threads";
 import { prisma } from "@/app/libs/prisma/prismaClient";
 import { NextResponse } from "next/server";
 

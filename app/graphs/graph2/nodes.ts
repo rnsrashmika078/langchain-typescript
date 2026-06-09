@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ConditionalEdgeRouter, GraphNode } from "@langchain/langgraph";
-import { graph2 } from "../schemas/graphSchema";
+import { graph1, graph2 } from "../schemas/graphSchema";
 import { graphLanguageModel } from "@/app/agents/languageModel";
 import { CommandStructuredOutput } from "../schemas/structuredOutputSchema";
 import { execFile } from "child_process";
+import { interrupt } from "@langchain/langgraph";
 
 // Node: => Find a path
 export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
@@ -12,35 +13,8 @@ export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
   }
 
   let prompt = "";
-  if (state.error) {
-    console.log("ERROR", state.error);
 
-    prompt = `
-  DECIDE SUITABLE POWERSHELL COMMAND BASED ON USER TASK, PROJECT FILE TREE AND POWERSHELL DOCUMENTATION
-  You MUST return ONLY valid JSON.
-
-  Output format:
-{"command": "string"}
-
-
-  TASK: ${state.task}
-  POWERSHELL DOCUMENTATION: ${state.powershellDoc}
-  PROJECT FILE TREE: ${state.fileTree}
-  ROOT DIRECTORY: ${state.rootDir}
-
-  COMMAND PATH MUST BE ABSOLUTE PATH. DONT USE RELATIVE PATH AT ALL
-  
-
-  Failed Commands list and corresponding errors : ${JSON.stringify(state.failedCommand)}
-
-  Rules:
-  - TRY NEW COMMAND THAT MATCH TO TASK. DONT USE failed command again and again
-  - Only return valid JSON
-  - No explanations
-  - No extra text
-  `;
-  } else {
-    prompt = `
+  prompt = `
   DECIDE SUITABLE POWERSHELL COMMAND BASED ON USER TASK, PROJECT FILE TREE AND POWERSHELL DOCUMENTATION
 
   You MUST return ONLY valid JSON.
@@ -59,7 +33,6 @@ export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
     - No explanations
     - No extra text
 `;
-  }
   // CURRENT WORKING DIRECTORY: ${state.rootDir}
   const structuredLlm = graphLanguageModel.withStructuredOutput(
     CommandStructuredOutput,
@@ -118,13 +91,26 @@ export const readFileTree: GraphNode<typeof graph2> = async (state, config) => {
     );
   });
 };
+export const approvalNode: GraphNode<typeof graph2> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Waiting to the approval...." });
+  }
+
+  const approved = interrupt({
+    question: "Do you want to proceed with this task?",
+    task: state.task,
+  });
+  if (approved) {
+    return { status: "approved" };
+  } else {
+    return { status: "rejected" };
+  }
+};
 export const readFilePath: GraphNode<typeof graph2> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Reading file paths...." });
   }
-
   const safeCommand = `Get-ChildItem -Path "${state.rootDir}" -Filter "${state.fileOrFolderName}" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
-
   return new Promise((resolve) => {
     execFile(
       "powershell",
@@ -135,17 +121,6 @@ export const readFilePath: GraphNode<typeof graph2> = async (state, config) => {
       },
     );
   });
-};
-export const isError: ConditionalEdgeRouter<typeof graph2> = (
-  state,
-  config,
-) => {
-  if (config.writer) {
-    config.writer({ message: "Checking errors..." });
-  }
-
-  if (state.error) return "Continue";
-  return "Done";
 };
 export const isReadDocs: ConditionalEdgeRouter<typeof graph2> = (
   state,
@@ -165,7 +140,6 @@ export const isReadFileTree: ConditionalEdgeRouter<typeof graph2> = (
   if (config.writer) {
     config.writer({ message: "Checking Memory..." });
   }
-
   if (state.fileTree) return "Yes";
   return "No";
 };
@@ -179,72 +153,4 @@ export const isLoopDone: ConditionalEdgeRouter<typeof graph2> = (
 
   if (state.fileTree) return "Yes";
   return "No";
-};
-export const runCommand: GraphNode<typeof graph2> = async (state, config) => {
-  if (config.writer) {
-    config.writer({ message: "Running Powershell command..." });
-  }
-
-  let safeCommand = state.command;
-
-  const hasGetChildItem =
-    safeCommand.includes("Get-ChildItem") ||
-    safeCommand.includes("ls") ||
-    safeCommand.includes("dir");
-
-  if (hasGetChildItem) {
-    safeCommand += ' | Where-Object { $_.FullName -notmatch "node_modules" }';
-  }
-
-  try {
-    return new Promise((resolve) => {
-      execFile(
-        "powershell",
-        ["-Command", safeCommand],
-        { cwd: state.rootDir },
-        (error, stdout, stderr) => {
-          if (error)
-            return resolve({
-              error: error.message,
-              failedCommand: [
-                ...(state.failedCommand ?? []),
-                {
-                  failedCommand: state.command,
-                  error: error ? (error.message as any) : undefined,
-                },
-              ],
-            });
-          if (stderr)
-            return resolve({
-              error: stderr,
-              failedCommand: [
-                ...(state.failedCommand ?? []),
-                {
-                  failedCommand: state.command,
-                  error: stderr ? (stderr as any) : undefined,
-                },
-              ],
-            });
-
-          resolve({
-            result: stdout || "required file or project not found!",
-            error: error || stderr ? error || (stderr as any) : undefined,
-            failedCommand: error
-              ? [
-                  ...(state.failedCommand ?? []),
-                  {
-                    failedCommand: state.command,
-                    error: error ? (error as any) : undefined,
-                  },
-                ]
-              : undefined,
-          });
-        },
-      );
-      console.log("error", state.error);
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error ";
-    return { error: message };
-  }
 };

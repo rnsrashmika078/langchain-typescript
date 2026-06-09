@@ -7,6 +7,7 @@ import { graphLanguageModel, languageModel } from "./languageModel";
 import { getWeather, modelTools } from "../tools/primaryTools";
 import { AgentState } from "../agent_middleware";
 import z from "zod";
+import { createDeepAgent, FilesystemBackend } from "deepagents";
 // import { checkpointer, getCheckpointer, InLineMemory } from "../memory/mongoDbSaver";
 // const checkpointer = await getRedisCheckpointer();
 // const checkpointer = await getRedisCheckpointer();
@@ -23,18 +24,18 @@ export const mainAgent = createAgent({
           allowedDecisions: ["approve", "reject"],
           description: "Execute this command?",
         },
-        fileSystemTool: {
+        deepAgent: {
           allowedDecisions: ["approve", "reject"],
-          description: "Execute this command?",
+          description: "Execute this Deep Agent?",
         },
-        fileOperationTool: {
-          allowedDecisions: ["approve", "reject"],
-          description: "Execute this command?",
-        },
-        getWeather: {
-          allowedDecisions: ["approve", "reject"],
-          description: "Execute this command?",
-        },
+        // fileOperationTool: {
+        //   allowedDecisions: ["approve", "reject"],
+        //   description: "Execute this command?",
+        // },
+        // getWeather: {
+        //   allowedDecisions: ["approve", "reject"],
+        //   description: "Execute this command?",
+        // },
       },
     }),
   ],
@@ -65,12 +66,12 @@ export const subAgent = createAgent({
   // checkpointer: checkpointer,
 });
 
-// export const deepAgent = createDeepAgent({
-//   model: languageModel,
-//   systemPrompt: "YOU ARE AN AI AGENT. AlWAYS RUN TOOLS",
-//   tools: modelTools,
-//   backend: new FilesystemBackend({
-//     rootDir: "C:\\Users\\Rashm\\OneDrive\\Desktop\\sandbox",
-//     virtualMode: false,
-//   }),
-// });
+export const deepAgent = createDeepAgent({
+  model: languageModel,
+  systemPrompt: "YOU ARE AN AI AGENT. AlWAYS RUN TOOLS",
+  tools: modelTools,
+  backend: new FilesystemBackend({
+    rootDir: "C:\\Users\\Rashm\\OneDrive\\Desktop\\sandbox",
+    virtualMode: false,
+  }),
+});

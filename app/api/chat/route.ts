@@ -1,10 +1,7 @@
-import { HITLResponse } from "langchain";
+import { HITLResponse, HumanMessage } from "langchain";
 import { NextResponse } from "next/server";
 import { Command } from "@langchain/langgraph";
 import { mainAgent } from "@/app/agents/agent";
-import connectDB from "@/app/libs/mongodb/connectDB";
-import Thread from "@/app/libs/mongodb/Threads";
-import { prisma } from "@/app/libs/mongodb/prismaClient";
 import { prismaUpsert } from "@/app/helper";
 
 export async function POST(req: Request) {
@@ -22,7 +19,7 @@ export async function POST(req: Request) {
     await prismaUpsert(thread_id);
     const input = interruptResponse
       ? new Command({ resume: { decisions: interruptResponse.decisions } })
-      : body.input;
+      : { messages: [new HumanMessage(body.input.messages[0].content)] };
 
     // const mainAgent = await getMainAgent();
     const stream = await mainAgent.stream(input, {

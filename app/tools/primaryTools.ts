@@ -7,6 +7,7 @@ import {
 import { tool, ToolRuntime } from "langchain";
 import * as z from "zod";
 import { fileSystemTool } from "../graphs/graph2/fileSystemGraph";
+import { deepAgent } from "../agents/agent";
 export const getWeather = tool(
   async (
     {
@@ -43,6 +44,21 @@ export const getWeather = tool(
     description: "Get weather",
     schema: z.object({
       city: z.string(),
+    }),
+  },
+);
+export const runDeepAgent = tool(
+  async ({ task }: { task: string }) => {
+    const result: any = await deepAgent.invoke({
+      messages: [{ role: "user", content: task }],
+    });
+    return result.messages[0].content;
+  },
+  {
+    name: "runDeepAgent",
+    description: "Create or overwrite a file with given content",
+    schema: z.object({
+      task: z.string().describe("Use given task"),
     }),
   },
 );
@@ -139,9 +155,16 @@ Output:
 - If no output, return success message
 `,
     schema: z.object({
-      command: z.string(),
+      command: z.string().describe(`
+          command that need to run.. usually comes from fileSystemTool call result
+        `),
     }),
   },
 );
 
-export const modelTools = [getWeather, generalShellTool, fileSystemTool];
+export const modelTools = [
+  // runDeepAgent,
+  getWeather,
+  generalShellTool,
+  fileSystemTool,
+];

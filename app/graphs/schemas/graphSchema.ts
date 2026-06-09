@@ -2,15 +2,18 @@ import { StateSchema } from "@langchain/langgraph";
 import z from "zod";
 
 // Graph 2 state
+// TODOS
+// --> clean up
 export const graph2 = new StateSchema({
   task: z.string(),
+  status: z.string(),
   rootDir: z.string(),
   command: z.string(),
   task_status: z.enum(["Success", "Failed", "Empty"]),
-  error: z.string(),
   result: z.string(),
   fileOrFolderName: z.optional(z.string()),
   absoluteFilePath: z.string(),
+  errorFileAbsolutePath: z.string(),
   fileTree: z.any(),
   powershellDoc: z.string(),
   failedCommand: z.array(
@@ -23,6 +26,8 @@ export const graph2 = new StateSchema({
   decision: z.string(),
   output: z.string(),
   isLoopDone: z.boolean(),
+  projectError: z.string(),
+  fixed_code: z.string(),
 });
 // Graph 1 state
 export const graph1 = new StateSchema({

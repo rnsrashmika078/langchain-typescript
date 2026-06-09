@@ -2,6 +2,7 @@
 import * as z from "zod";
 import { tool, ToolRuntime } from "langchain";
 import {
+  Command,
   ConditionalEdgeRouter,
   END,
   GraphNode,
@@ -10,13 +11,17 @@ import {
 } from "@langchain/langgraph";
 import { graph2 } from "../schemas/graphSchema";
 import {
+  approvalNode,
   getCommand,
   readFilePath,
   readFileTree,
   readPowershellDocs,
 } from "./nodes";
 import { graphLanguageModel } from "@/app/agents/languageModel";
-import { generateFileResources } from "../graph1/nodes";
+import { createFileResources, fixFileResource } from "../graph1/nodes";
+import { getPostgressCheckpointer } from "@/app/memory/memorySavers";
+
+const checkpointer = await getPostgressCheckpointer();
 // import { getCheckpointer } from "@/app/memory/mongoDbSaver";
 // const checkpointer = await getCheckpointer();
 const routeSchema = z.object({
@@ -44,9 +49,10 @@ Format:
 
 
 Rules:
-- If the task is about a specific file (e.g., README.md, Welcome.tsx, file content, file path) → second
-- If the task is about folder structure, listing files, searching files → first
+- If the task is about folder structure, listing files → first
+- If the task is about a specific file but not related to coding issue (e.g., README.md, Welcome.tsx, find file content, find file path) → second
 - If the task is about Create file/folder → third
+- If the task is about code fixing / current the code → fourth
 `;
   const decision = await router.invoke([
     {
@@ -70,6 +76,7 @@ const routeDecision: ConditionalEdgeRouter<typeof graph2, any> = (state) => {
   } else if (state.decision === "third") {
     return "create_file_init";
   } else {
+    return "code_fixer_init";
   }
 };
 
@@ -79,6 +86,7 @@ export const fileSystemTool = tool(
     runtime: ToolRuntime,
   ) => {
     const rootDir = runtime?.configurable?.rootPath;
+    const thread_id = runtime?.configurable?.thread_id;
     const graph = new StateGraph(graph2)
 
       // Route A
@@ -86,12 +94,18 @@ export const fileSystemTool = tool(
 
       // Route B
       .addNode("read_file_path", readFilePath)
+      .addNode("approve_node", approvalNode)
 
       .addNode("get_command", getCommand)
 
-      // Route C
+      // Rote C
       .addNode("create_file_init", readFileTree)
-      .addNode("generateFileResources", generateFileResources)
+      .addNode("createFileResources", createFileResources)
+      // .addNode("generate_content", generateFileContent)
+
+      // Route D
+      .addNode("code_fixer_init", readFilePath)
+      .addNode("fixFileResource", fixFileResource)
       // .addNode("generate_content", generateFileContent)
 
       // common
@@ -106,19 +120,28 @@ export const fileSystemTool = tool(
         "read_file_tree",
         "read_file_path",
         "create_file_init",
+        "code_fixer_init",
       ])
 
-      // End file create path
-      .addEdge("create_file_init", "generateFileResources")
-      .addEdge("generateFileResources", END)
+      //file create path
+      .addEdge("create_file_init", "createFileResources")
+      .addEdge("createFileResources", END)
+
+      //file fix path
+      .addEdge("code_fixer_init", "fixFileResource")
+      .addEdge("fixFileResource", END)
 
       //folder path route
-      .addEdge("read_file_tree", "read_powershell_docs")
-      .addEdge("read_file_path", "read_powershell_docs")
+      .addEdge("read_file_tree", "approve_node")
+      .addEdge("read_file_path", "approve_node")
+      .addEdge("approve_node", "read_powershell_docs")
+      // .addEdge("approve_node", "read_powershell_docs")
       .addEdge("read_powershell_docs", "get_command")
       .addEdge("get_command", END)
 
-      .compile();
+      .compile({ checkpointer: checkpointer });
+
+    const config = { configurable: { thread_id } };
 
     const inputs = {
       task,
@@ -130,6 +153,7 @@ export const fileSystemTool = tool(
     let custom: any = "";
 
     for await (const [mode, chunk] of await graph.stream(inputs, {
+      ...config,
       streamMode: ["values", "custom"],
     })) {
       if (mode === "values") {
@@ -141,6 +165,13 @@ export const fileSystemTool = tool(
         }
       }
     }
+    // const result = await graph.invoke(
+    //   { task, rootDir, fileOrFolderName },
+    //   config,
+    // );
+    await graph.invoke(new Command({ resume: true }), config);
+    console.log("interruption", full_state.__interrupt__);
+
     return full_state.command;
   },
   {
@@ -151,16 +182,13 @@ export const fileSystemTool = tool(
       Used for:
       - Reading file tree
       - Inspecting project structure
-      - Running file-system related PowerShell commands
+      - Decide file path to create file/files
+      - Decide file content
       - Understanding project state
 
       Rules:
-      - Break complex tasks into sequential steps internally.
-      - Execute ONE operation per step (no parallel actions).
       - Do NOT assume file system state — always fetch fresh data.
 
-      Output:
-      - the powershell command that need to run using generalShellTool
       `,
     schema: z.object({
       task: z.string().describe(
