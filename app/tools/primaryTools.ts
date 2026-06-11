@@ -6,8 +6,9 @@ import {
 } from "@/app/helper";
 import { tool, ToolRuntime } from "langchain";
 import * as z from "zod";
-import { fileSystemTool } from "../graphs/graph2/fileSystemGraph";
 import { deepAgent } from "../agents/agent";
+import { GeneralShellCommandGenerator } from "../graphs/graph2/GeneralShellCommandGenerator";
+import { FileMutationCommandGenerator } from "../graphs/graph1/FileMutationCommandGenerator";
 export const getWeather = tool(
   async (
     {
@@ -63,7 +64,7 @@ export const runDeepAgent = tool(
   },
 );
 
-export const generalShellTool = tool(
+export const ShellCommandExecutor = tool(
   async (
     {
       command,
@@ -131,7 +132,7 @@ export const generalShellTool = tool(
     return result;
   },
   {
-    name: "generalShellTool",
+    name: "ShellCommandExecutor",
     description: `
 Run non-interactive PowerShell commands in the current project directory.
 
@@ -165,6 +166,7 @@ Output:
 export const modelTools = [
   // runDeepAgent,
   getWeather,
-  generalShellTool,
-  fileSystemTool,
+  FileMutationCommandGenerator,
+  ShellCommandExecutor,
+  GeneralShellCommandGenerator,
 ];

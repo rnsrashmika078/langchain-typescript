@@ -1,41 +1,30 @@
-import { createAgent, humanInTheLoopMiddleware, trimMessages } from "langchain";
-import {
-  getPostgressCheckpointer,
-} from "../memory/memorySavers";
+import { createAgent, humanInTheLoopMiddleware } from "langchain";
+import { trimMessages } from "../agent_middleware";
+import { getPostgressCheckpointer } from "../memory/memorySavers";
 import { mainAgentSystemPrompt } from "../data";
 import { graphLanguageModel, languageModel } from "./languageModel";
-import { getWeather, modelTools } from "../tools/primaryTools";
+import { modelTools } from "../tools/secondaryTools";
+import { getWeather } from "../tools/primaryTools";
 import { AgentState } from "../agent_middleware";
 import z from "zod";
 import { createDeepAgent, FilesystemBackend } from "deepagents";
-// import { checkpointer, getCheckpointer, InLineMemory } from "../memory/mongoDbSaver";
-// const checkpointer = await getRedisCheckpointer();
-// const checkpointer = await getRedisCheckpointer();
 const checkpointer = await getPostgressCheckpointer();
 export const mainAgent = createAgent({
   model: languageModel,
   systemPrompt: mainAgentSystemPrompt,
+  // systemPrompt: mainAgentSystemPrompt,
   tools: modelTools,
+  
   // stateSchema: AgentState,
   middleware: [
+    trimMessages,
     humanInTheLoopMiddleware({
       interruptOn: {
-        generalShellTool: {
+        CreateFileTool: {
           allowedDecisions: ["approve", "reject"],
           description: "Execute this command?",
         },
-        deepAgent: {
-          allowedDecisions: ["approve", "reject"],
-          description: "Execute this Deep Agent?",
-        },
-        // fileOperationTool: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "Execute this command?",
-        // },
-        // getWeather: {
-        //   allowedDecisions: ["approve", "reject"],
-        //   description: "Execute this command?",
-        // },
+        ReadProjectTreeTool: false,
       },
     }),
   ],

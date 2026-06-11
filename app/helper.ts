@@ -2,8 +2,6 @@
 import { mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { v4 as uuid } from "uuid";
-import path from "path";
-import fs from "fs";
 import { execFile, execFileSync, spawn } from "child_process";
 import { prisma } from "./libs/prisma/prismaClient";
 
@@ -76,6 +74,8 @@ export async function asyncExecPowerShell(
   command: string,
   rootPath: string,
 ): Promise<string> {
+
+  
   return new Promise((resolve) => {
     execFile(
       "powershell",
@@ -87,7 +87,7 @@ export async function asyncExecPowerShell(
         // if (runtime.writer) {
         //   runtime.writer({ message: "Executing powershell command..." });
         // }
-        resolve(stdout || "Command Execute Silently.");
+        resolve(stdout || "success.");
       },
     );
   });

@@ -26,8 +26,10 @@ export const reactCodeErrorFixedOutput = z.object({
   fixed_code: z.string().describe("fixed, error free code"),
 });
 export const createFileStructureOutput = z.object({
-  absoluteFilePath: z.string().describe("POWERSHELL COMMAND"),
+  absoluteFilePath: z.string().describe("destination absolute file path"),
   content: z.string().describe("file content"),
+  command: z.string().describe("POWERSHELL COMMAND"),
+
 });
 export const contentFileStructuredOutput = z.object({
   content: z
