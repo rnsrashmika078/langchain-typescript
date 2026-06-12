@@ -3,20 +3,23 @@ import { tool, ToolRuntime } from "langchain";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import { graph1 } from "../schemas/graphSchema";
 import { FMCGProperties } from "@/markdown/tool_properties";
-import { readFileTree } from "../graph2/g2_nodes";
+import { finishUpdate, readFile, updateFile } from "../graph2/g2_nodes";
 import { generateFileContent } from "./g1_nodes";
-export const FileMutationCommandGenerator = tool(
+import z from "zod";
+export const UpdateFileTool = tool(
   async (
-    { fileName, task }: { fileName: string; task: string },
+    { task, fileName }: { task: string; fileName: string },
     runtime: ToolRuntime,
   ) => {
     const rootDir = runtime?.configurable?.rootPath;
     const graph = new StateGraph(graph1)
-      .addNode("read_file_tree", readFileTree)
-      .addNode("generatefile", generateFileContent)
-      .addEdge(START, "read_file_tree")
-      .addEdge("read_file_tree", "generatefile")
-      .addEdge("generatefile", END)
+      .addNode("readFile", readFile)
+      .addNode("updateFile", updateFile)
+      .addNode("finishUpdate", finishUpdate)
+      .addEdge(START, "readFile")
+      .addEdge("readFile", "updateFile")
+      .addEdge("updateFile", "finishUpdate")
+      .addEdge("finishUpdate", END)
       .compile();
 
     const inputs = {
@@ -40,10 +43,21 @@ export const FileMutationCommandGenerator = tool(
         }
       }
     }
-
-    return full_state.command;
+    return "successfully update the file";
   },
   {
-    ...FMCGProperties,
+    name: "UpdateFileTool",
+    description: `
+          Read and update file/files content
+          `,
+    schema: z.object({
+      task: z.string().describe(
+        `Describe the task
+    `,
+      ),
+      fileName: z
+        .optional(z.string())
+        .describe("file /folder name only .. no paths "),
+    }),
   },
 );

@@ -2,8 +2,10 @@
 import { asyncExecPowerShell } from "@/app/helper";
 import { mkdirSync, writeFileSync } from "fs";
 import { tool, ToolRuntime } from "langchain";
-import path, { dirname } from "path";
 import * as z from "zod";
+import { getWeatherTool, ShellCommandExecutor } from "./primaryTools";
+import path, { dirname } from "path";
+import { UpdateFileTool } from "../graphs/graph1/FileMutationCommandGenerator";
 
 export const ReadProjectTreeTool = tool(
   async (
@@ -12,16 +14,21 @@ export const ReadProjectTreeTool = tool(
     }: {
       task: string;
     },
-    runtime: ToolRuntime,
+    config: ToolRuntime,
   ) => {
-    const rootDir = runtime?.configurable?.rootPath;
-    const safeCommand = `Get-ChildItem -Path "${rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
+    try {
+      const rootDir = config?.configurable?.rootPath;
+      const safeCommand = `Get-ChildItem -Path "${rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
+      const writer = config.writer;
 
-    if (runtime.writer) {
-      runtime.writer("Scanning the project explore...");
+      if (writer) {
+        writer("Scanning the project explore...");
+      }
+      const result = await asyncExecPowerShell(safeCommand, rootDir);
+      return result;
+    } catch (error) {
+      return `error while creating files ${error instanceof Error && error.message}`;
     }
-    const result = await asyncExecPowerShell(safeCommand, rootDir);
-    return result;
   },
   {
     name: "ReadProjectTreeTool",
@@ -35,7 +42,7 @@ read the file tree of active project.
     }),
   },
 );
-export const CreateFileTool = tool(
+export const CreateUpdateFile = tool(
   async (
     {
       absoluteFilePath,
@@ -44,38 +51,61 @@ export const CreateFileTool = tool(
       absoluteFilePath: string;
       content: string;
     },
-    runtime: ToolRuntime,
+    config: ToolRuntime,
   ) => {
-    const rootDir = runtime?.configurable?.rootPath;
-    console.log("absolute path", absoluteFilePath);
-    // const dir = dirname(rootDir);
-    mkdirSync(absoluteFilePath, { recursive: true });
-    const paths = rootDir + "\\" + absoluteFilePath;
+    try {
+      const writer = config.writer;
 
-    writeFileSync(paths, content, "utf-8");
-    return "Files created successfully" ;
+      if (writer) {
+        writer("Generating files...");
+      }
+      const rootDir = config?.configurable?.rootPath;
+      const dirModified = absoluteFilePath.includes("C:")
+        ? absoluteFilePath
+        : path.join(rootDir, absoluteFilePath);
+      mkdirSync(dirname(dirModified), { recursive: true });
+
+      writeFileSync(dirModified, content, "utf-8");
+      return {
+        success: true,
+        message: `Files Created successfully`,
+      };
+    } catch (error) {
+      return `error while creating files ${error instanceof Error && error.message}`;
+    }
   },
   {
-    name: "CreateFileTool",
+    name: "CreateFile",
     description: `
 create file/files 
+
+parameters: 
+  content,
+  absoluteFilePath
+  operation
+
+    NEVER ASSUME THE FILE PATH. instead run ReadProjectTreeTool 
 `,
     schema: z.object({
-      task: z.string().describe(`
-        task name
-        `),
       content: z.string().describe(`
           file content
         `),
       absoluteFilePath: z.string().describe(`
-          absolute file path to the file destination
-          NEVER ASSUME THE FILE PATH
+          absolute file path to the file destination choose from ReadProjectTreeTool result
+          example : "/src/component/first.txt"
         `),
+      operation: z.enum(["Create", "Update"]),
     }),
   },
 );
 
-export const modelTools = [ReadProjectTreeTool, CreateFileTool];
+export const modelTools = [
+  ReadProjectTreeTool,
+  CreateUpdateFile,
+  getWeatherTool,
+  UpdateFileTool,
+  ShellCommandExecutor,
+];
 
 //     // const safeCommand = `Get-ChildItem -Path "${rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
 //     const safeCommand = `Set-Content -Path "${absoluteFilePath}" -Value @"

@@ -1,7 +1,7 @@
 {
   "languageModel": {
     "model": "gemma4:e2b",
-    "reasoning": true,
+    "reasoning": false,
     "temperature": 0,
     "graphLanguageModel": {
       "model": "gemma4:e2b",

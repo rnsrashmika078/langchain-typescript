@@ -7,9 +7,9 @@ import {
 import { tool, ToolRuntime } from "langchain";
 import * as z from "zod";
 import { deepAgent } from "../agents/agent";
-import { GeneralShellCommandGenerator } from "../graphs/graph2/GeneralShellCommandGenerator";
-import { FileMutationCommandGenerator } from "../graphs/graph1/FileMutationCommandGenerator";
-export const getWeather = tool(
+// import { GeneralShellCommandGenerator } from "../graphs/graph2/GeneralShellCommandGenerator";
+// import { FileMutationCommandGenerator } from "../graphs/graph1/FileMutationCommandGenerator";
+export const getWeatherTool = tool(
   async (
     {
       city,
@@ -41,7 +41,7 @@ export const getWeather = tool(
     }
   },
   {
-    name: "get_weather",
+    name: "getWeatherTool",
     description: "Get weather",
     schema: z.object({
       city: z.string(),
@@ -165,8 +165,8 @@ Output:
 
 export const modelTools = [
   // runDeepAgent,
-  getWeather,
-  FileMutationCommandGenerator,
+  getWeatherTool,
+  // FileMutationCommandGenerator,
   ShellCommandExecutor,
-  GeneralShellCommandGenerator,
+  // GeneralShellCommandGenerator,
 ];

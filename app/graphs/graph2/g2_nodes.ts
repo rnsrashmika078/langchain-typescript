@@ -1,9 +1,14 @@
 import { GraphNode } from "@langchain/langgraph";
 import { graph2 } from "../schemas/graphSchema";
 import { graphLanguageModel } from "@/app/agents/languageModel";
-import { CommandStructuredOutput } from "../schemas/structuredOutputSchema";
+import {
+  CommandStructuredOutput,
+  updateContentStructuredOutput,
+} from "../schemas/structuredOutputSchema";
 import { execFile } from "child_process";
 import { powershellDoc } from "@/markdown/markdown";
+import { writeFileSync } from "fs";
+import path from "path";
 
 // Node: => Find a path
 export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
@@ -58,19 +63,69 @@ export const readFileTree: GraphNode<typeof graph2> = async (state, config) => {
     );
   });
 };
-export const readFilePath: GraphNode<typeof graph2> = async (state, config) => {
+export const readFile: GraphNode<typeof graph2> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Reading file paths...." });
   }
-  const safeCommand = `Get-ChildItem -Path "${state.rootDir}" -Filter "${state.fileOrFolderName}" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
+
+  const safeCommand = `Get-ChildItem -Path "${state.rootDir}" -Filter "${state.fileName}" -Recurse -ErrorAction SilentlyContinue |
+Where-Object { $_.FullName -notmatch "node_modules" } |
+ForEach-Object {
+    "---- $($_.FullName) ----"
+    Get-Content $_.FullName
+}`;
+  // const safeCommand = `Get-ChildItem -Path "${state.rootDir}" -Filter "${state.fileOrFolderName}" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
   return new Promise((resolve) => {
     execFile(
       "powershell",
       ["-Command", safeCommand],
       { cwd: state.rootDir },
       (error, stdout, stderr) => {
-        resolve({ fileTree: stdout });
+        resolve({ content: stdout });
       },
     );
   });
+};
+export const updateFile: GraphNode<typeof graph2> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Updating file paths...." });
+  }
+  let prompt = "";
+  prompt = `
+  YOU ARE EXPERT REACT VITE DEVELOPER
+  You MUST return ONLY valid JSON.
+
+  BASE ON THE TASK MODIFY/UPDATE THE CODE/CONTENT
+
+  TASK:${state.task}
+  CONTENT TO BE UPDATE OR MODIFIED:${state.content}
+
+  Output format:
+  {"content": "string", "absoluteFilePath:"string"}
+
+   Rules:
+    - Only return valid JSON
+    - No explanations
+    - No extra text
+`;
+  // CURRENT WORKING DIRECTORY: ${state.rootDir}
+  const structuredLlm = graphLanguageModel.withStructuredOutput(
+    updateContentStructuredOutput,
+  );
+  const result = await structuredLlm.invoke(prompt);
+  return { content: result.content, absoluteFilePath: result.filePath };
+};
+export const finishUpdate: GraphNode<typeof graph2> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Updating file paths...." });
+  }
+  const dirModified = state.absoluteFilePath.includes("C:")
+    ? state.absoluteFilePath
+    : path.join(state.rootDir, state.absoluteFilePath);
+  console.log("file absolute path: ", state.absoluteFilePath);
+  console.log("file content: ", state.content);
+  writeFileSync(dirModified, state.content, "utf-8");
+  console.log("file modified path: ", dirModified);
+
+  return { content: "Success" };
 };

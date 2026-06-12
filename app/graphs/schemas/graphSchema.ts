@@ -9,11 +9,12 @@ export const graph2 = new StateSchema({
   status: z.string(),
   rootDir: z.string(),
   command: z.string(),
-  fileOrFolderName: z.optional(z.string()),
+  fileName: z.optional(z.string()),
   absoluteFilePath: z.string(),
   fileTree: z.any(),
   powershellDoc: z.string(),
   decision: z.string(),
+  content: z.string(),
 });
 // Graph 1 state
 export const graph1 = new StateSchema({

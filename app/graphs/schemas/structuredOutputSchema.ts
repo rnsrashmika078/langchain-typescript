@@ -29,12 +29,15 @@ export const createFileStructureOutput = z.object({
   absoluteFilePath: z.string().describe("destination absolute file path"),
   content: z.string().describe("file content"),
   command: z.string().describe("POWERSHELL COMMAND"),
-
 });
 export const contentFileStructuredOutput = z.object({
   content: z
     .string()
     .describe("content to the file based on the task; e.g.React code"),
+});
+export const updateContentStructuredOutput = z.object({
+  content: z.string().describe("update content"),
+  filePath: z.string(),
 });
 
 // Schema for structured output -> powershell docs ( graph2 )

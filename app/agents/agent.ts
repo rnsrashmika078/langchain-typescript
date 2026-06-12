@@ -4,7 +4,7 @@ import { getPostgressCheckpointer } from "../memory/memorySavers";
 import { mainAgentSystemPrompt } from "../data";
 import { graphLanguageModel, languageModel } from "./languageModel";
 import { modelTools } from "../tools/secondaryTools";
-import { getWeather } from "../tools/primaryTools";
+import { getWeatherTool } from "../tools/primaryTools";
 import { AgentState } from "../agent_middleware";
 import z from "zod";
 import { createDeepAgent, FilesystemBackend } from "deepagents";
@@ -14,13 +14,17 @@ export const mainAgent = createAgent({
   systemPrompt: mainAgentSystemPrompt,
   // systemPrompt: mainAgentSystemPrompt,
   tools: modelTools,
-  
+
   // stateSchema: AgentState,
   middleware: [
-    trimMessages,
+    // trimMessages,
     humanInTheLoopMiddleware({
       interruptOn: {
         CreateFileTool: {
+          allowedDecisions: ["approve", "reject"],
+          description: "Execute this command?",
+        },
+        getWeatherTool: {
           allowedDecisions: ["approve", "reject"],
           description: "Execute this command?",
         },
@@ -39,7 +43,7 @@ export const subAgent = createAgent({
   model: graphLanguageModel,
   systemPrompt:
     "You are help full coding assistant. USE getWeather tool to get the weather data",
-  tools: [getWeather],
+  tools: [getWeatherTool],
   responseFormat: weatherSchema,
   middleware: [
     trimMessages,
