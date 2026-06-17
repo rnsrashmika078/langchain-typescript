@@ -25,4 +25,7 @@ export const graph1 = new StateSchema({
   fileTree: z.string(),
   absoluteFilePath: z.string(),
   command: z.string(),
+  decision: z.string(),
+  error: z.string().optional().nullable(),
 });
+// accept undefined or null when missing

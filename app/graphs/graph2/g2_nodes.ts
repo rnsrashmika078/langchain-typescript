@@ -1,5 +1,5 @@
 import { GraphNode } from "@langchain/langgraph";
-import { graph2 } from "../schemas/graphSchema";
+import { graph1, graph2 } from "../schemas/graphSchema";
 import { graphLanguageModel } from "@/app/agents/languageModel";
 import {
   CommandStructuredOutput,
@@ -86,7 +86,7 @@ ForEach-Object {
     );
   });
 };
-export const updateFile: GraphNode<typeof graph2> = async (state, config) => {
+export const updateFile: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Updating file paths...." });
   }
@@ -95,10 +95,40 @@ export const updateFile: GraphNode<typeof graph2> = async (state, config) => {
   YOU ARE EXPERT REACT VITE DEVELOPER
   You MUST return ONLY valid JSON.
 
-  BASE ON THE TASK MODIFY/UPDATE THE CODE/CONTENT
+  BASE ON THE TASK MODIFY/UPDATE/FIX ERROR IN THE CODE/CONTENT
 
   TASK:${state.task}
   CONTENT TO BE UPDATE OR MODIFIED:${state.content}
+
+  Output format:
+  {"content": "string", "absoluteFilePath:"string"}
+
+   Rules:
+    - Only return valid JSON
+    - No explanations
+    - No extra text
+`;
+  // CURRENT WORKING DIRECTORY: ${state.rootDir}
+  const structuredLlm = graphLanguageModel.withStructuredOutput(
+    updateContentStructuredOutput,
+  );
+  const result = await structuredLlm.invoke(prompt);
+  return { content: result.content, absoluteFilePath: result.filePath };
+};
+export const fixError: GraphNode<typeof graph1> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Fix error file paths...." });
+  }
+  let prompt = "";
+  prompt = `
+  YOU ARE EXPERT REACT VITE DEVELOPER
+  You MUST return ONLY valid JSON.
+
+  BASE ON THE TASK MODIFY/UPDATE/FIX ERROR IN THE CODE/CONTENT
+
+  TASK:${state.task}
+  CONTENT TO BE UPDATE OR MODIFIED:${state.content}
+  ERROR TO FIX : ${state.error}
 
   Output format:
   {"content": "string", "absoluteFilePath:"string"}

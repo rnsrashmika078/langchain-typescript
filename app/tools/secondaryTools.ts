@@ -5,7 +5,7 @@ import { tool, ToolRuntime } from "langchain";
 import * as z from "zod";
 import { getWeatherTool, ShellCommandExecutor } from "./primaryTools";
 import path, { dirname } from "path";
-import { UpdateFileTool } from "../graphs/graph1/FileMutationCommandGenerator";
+import { UpdateOrErrorFixFileTool } from "../graphs/graph1/FileMutationCommandGenerator";
 
 export const ReadProjectTreeTool = tool(
   async (
@@ -98,12 +98,62 @@ parameters:
     }),
   },
 );
+export const runSubAgent = tool(
+  async (
+    {
+      absoluteFilePath,
+      content,
+    }: {
+      absoluteFilePath: string;
+      content: string;
+    },
+    config: ToolRuntime,
+  ) => {
+    try {
+      const writer = config.writer;
+
+      if (writer) {
+        writer("Generating files...");
+      }
+      const rootDir = config?.configurable?.rootPath;
+      return {
+        success: true,
+        message: `Files Created successfully`,
+      };
+    } catch (error) {
+      return `error while creating files ${error instanceof Error && error.message}`;
+    }
+  },
+  {
+    name: "CreateFile",
+    description: `
+create file/files 
+
+parameters: 
+  content,
+  absoluteFilePath
+  operation
+
+    NEVER ASSUME THE FILE PATH. instead run ReadProjectTreeTool 
+`,
+    schema: z.object({
+      content: z.string().describe(`
+          file content
+        `),
+      absoluteFilePath: z.string().describe(`
+          absolute file path to the file destination choose from ReadProjectTreeTool result
+          example : "/src/component/first.txt"
+        `),
+      operation: z.enum(["Create", "Update"]),
+    }),
+  },
+);
 
 export const modelTools = [
   ReadProjectTreeTool,
   CreateUpdateFile,
   getWeatherTool,
-  UpdateFileTool,
+  UpdateOrErrorFixFileTool,
   ShellCommandExecutor,
 ];
 
