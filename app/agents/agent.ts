@@ -25,13 +25,7 @@ export const mainAgent = createAgent({
 
   // stateSchema: AgentState,
   middleware: [
-    createFilesystemMiddleware({
-      backend: new FilesystemBackend({
-        rootDir: `C:/Users/Rashm/OneDrive/Desktop/VIRTUAL`,
-        virtualMode: true,
-      }),
-    }),
-    trimMessages,
+    // trimMessages,
     humanInTheLoopMiddleware({
       interruptOn: {
         CreateFileTool: {

@@ -15,44 +15,26 @@ import {
   updateFile,
 } from "../graph2/g2_nodes";
 import z from "zod";
-import { graphLanguageModel } from "@/app/agents/languageModel";
-
-const callRouter: GraphNode<typeof graph1> = async (state) => {
-  if (state.error) {
-    return { decision: "fixer" };
-  }
-  return { decision: "updater" };
-};
-const routeDecision: ConditionalEdgeRouter<typeof graph1, any> = (state) => {
-  if (state.decision === "fixer") {
-    return "fixFileError";
-  } else if (state.decision === "updater") {
-    return "updateFile";
-  } else {
-    return "third";
-  }
-};
-
-export const UpdateOrErrorFixFileTool = tool(
+export const UpdateFileTool = tool(
   async (
-    { task, fileName }: { task: string; fileName: string },
-    runtime: ToolRuntime,
+    {
+      task,
+      fileName,
+      operation,
+    }: {
+      task: string;
+      fileName: string;
+      operation: "READ" | "UPDATE" | "FIXERROR" | "DELETE";
+    },
+    config: ToolRuntime,
   ) => {
-    const rootDir = runtime?.configurable?.rootPath;
-    const error = runtime?.configurable?.error;
+    const rootDir = config?.configurable?.rootPath;
     const graph = new StateGraph(graph1)
       .addNode("readFile", readFile)
       .addNode("updateFile", updateFile)
-      .addNode("fixFileError", fixError)
       .addNode("finishUpdate", finishUpdate)
-      .addNode("callRouter", callRouter)
       .addEdge(START, "readFile")
-      .addEdge("readFile", "callRouter")
-      .addConditionalEdges("callRouter", routeDecision, [
-        "fixFileError",
-        "updateFile",
-      ])
-      .addEdge("fixFileError", "finishUpdate")
+      .addEdge("readFile", "updateFile")
       .addEdge("updateFile", "finishUpdate")
       .addEdge("finishUpdate", END)
       .compile();
@@ -61,39 +43,45 @@ export const UpdateOrErrorFixFileTool = tool(
       rootDir,
       task,
       fileName,
-      error,
     };
 
-    let full_state: any = "";
-    let custom: any = "";
+      let full_state: any = "";
+      let updates: any = "";
+      let custom: any = "";
 
-    for await (const [mode, chunk] of await graph.stream(inputs, {
-      streamMode: ["values", "custom"],
-    })) {
-      if (mode === "values") {
-        full_state = chunk;
-      } else if (mode === "custom") {
-        if (runtime.writer) {
-          custom = chunk;
-          runtime.writer(custom.message);
+      for await (const [mode, chunk] of await graph.stream(inputs, {
+        streamMode: ["values", "custom", "updates"],
+      })) {
+        if (mode === "values") {
+          full_state = chunk;
+        } else if (mode === "updates") {
+          updates = chunk;
+        } else if (mode === "custom") {
+          if (config.writer) {
+            custom = chunk;
+            config.writer(custom.message);
+          }
         }
       }
+      // const state = graph.invoke(inputs);
+
+      return { content: full_state.content, updates };
+    } catch (error) {
+      return `error while performing the action ${error instanceof Error && error.message}`;
     }
-    return "successfully update the file";
   },
   {
     name: "UpdateOrErrorFixFileTool",
     description: `
-          Read,update and error fix on file/files content
+          Read and update file/files content
           `,
     schema: z.object({
       task: z.string().describe(
         `Describe the task
     `,
       ),
-      fileName: z
-        .optional(z.string())
-        .describe("file /folder name only .. no paths "),
+      operation: z.enum(["UPDATE", "DELETE", "READ"]),
+      fileName: z.string().describe("file /folder name only .. no paths "),
     }),
   },
 );

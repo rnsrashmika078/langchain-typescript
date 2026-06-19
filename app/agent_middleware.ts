@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { RemoveMessage } from "@langchain/core/messages";
-import { Annotation, messagesStateReducer, REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
+import {
+  Annotation,
+  messagesStateReducer,
+  REMOVE_ALL_MESSAGES,
+} from "@langchain/langgraph";
 import { createMiddleware } from "langchain";
 
 export const trimMessages = createMiddleware({
@@ -8,14 +12,17 @@ export const trimMessages = createMiddleware({
   beforeModel: (state) => {
     const messages = state.messages;
 
-    if (messages.length <= 3) {
+    let newMessages: any = [];
+    if (messages.length <= 30) {
       return;
     }
+    const trim = messages.slice(10, messages.length);
+    newMessages = trim;
 
-    const firstMsg = messages[0];
-    const recentMessages =
-      messages.length % 2 === 0 ? messages.slice(-3) : messages.slice(-4);
-    const newMessages = [firstMsg, ...recentMessages];
+    // const firstMsg = messages[0];
+    // const recentMessages =
+    //   messages.length % 2 === 0 ? messages.slice(-3) : messages.slice(-4);
+    // const newMessages = [firstMsg, ...recentMessages];
 
     return {
       messages: [
@@ -43,7 +50,7 @@ export const deleteOldMessages = createMiddleware({
       return {
         messages: messages
           .slice(0, 2)
-          .map((m) => new RemoveMessage({ id: m.id!})),
+          .map((m) => new RemoveMessage({ id: m.id! })),
       };
     }
   },

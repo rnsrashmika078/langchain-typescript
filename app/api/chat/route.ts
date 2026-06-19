@@ -24,7 +24,6 @@ export async function POST(req: Request) {
     // const mainAgent = await getMainAgent();
     const stream = await mainAgent.stream(input, {
       ...config,
-      
       encoding: "text/event-stream",
       streamMode: [
         "updates",

@@ -4,6 +4,7 @@ import {
   FetchStreamTransport,
   useStream,
 } from "@langchain/langgraph-sdk/react";
+import Render from "./render";
 export default function Home() {
   const transport = useMemo(() => {
     return new FetchStreamTransport({
@@ -33,11 +34,12 @@ export default function Home() {
   };
   console.log("messages", stream.messages);
   return (
-    <pre className="text-xs items-center justify-center flex h-screen">
+    <div className="text-xs items-center justify-center flex h-screen">
+      <Render />
       {stream.messages.map((msg) => (
         <div key={msg.id}>{JSON.stringify(msg)}</div>
       ))}
-      <input
+      {/* <input
         className="border p-5"
         type="text"
         onKeyDown={(e) => {
@@ -46,7 +48,7 @@ export default function Home() {
             handleSubmit(content);
           }
         }}
-      ></input>
-    </pre>
+      ></input> */}
+    </div>
   );
 }

@@ -74,8 +74,6 @@ export async function asyncExecPowerShell(
   command: string,
   rootPath: string,
 ): Promise<string> {
-
-  
   return new Promise((resolve) => {
     execFile(
       "powershell",
@@ -87,6 +85,7 @@ export async function asyncExecPowerShell(
         // if (runtime.writer) {
         //   runtime.writer({ message: "Executing powershell command..." });
         // }
+        console.log("stand", stdout);
         resolve(stdout || "success.");
       },
     );
