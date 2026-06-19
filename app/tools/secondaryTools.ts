@@ -3,8 +3,9 @@ import { asyncExecPowerShell } from "@/app/helper";
 import { mkdirSync, writeFileSync } from "fs";
 import { tool, ToolRuntime } from "langchain";
 import * as z from "zod";
-import { getWeatherTool, ShellCommandExecutor } from "./primaryTools";
+// import { getWeatherTool, shellTool } from "./primaryTools";
 import path, { dirname } from "path";
+import { getWeatherTool, ShellCommandExecutor } from "./primaryTools";
 import { UpdateFileTool } from "../graphs/graph1/FileMutationCommandGenerator";
 
 export const ReadProjectTreeTool = tool(
@@ -18,7 +19,13 @@ export const ReadProjectTreeTool = tool(
   ) => {
     try {
       const rootDir = config?.configurable?.rootPath;
-      const safeCommand = `Get-ChildItem -Path "${rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
+      // const safeCommand = `Get-ChildItem -Path "${rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
+
+      const safeCommand = `
+Get-ChildItem -Path "${rootDir}" -Recurse -ErrorAction SilentlyContinue |
+Where-Object { $_.FullName -notmatch "node_modules" } |
+Select-Object -ExpandProperty FullName
+`;
       const writer = config.writer;
 
       if (writer) {
@@ -42,7 +49,7 @@ read the file tree of active project.
     }),
   },
 );
-export const CreateUpdateFile = tool(
+export const CreateFile = tool(
   async (
     {
       absoluteFilePath,
@@ -82,7 +89,6 @@ create file/files
 parameters: 
   content,
   absoluteFilePath
-  operation
 
     NEVER ASSUME THE FILE PATH. instead run ReadProjectTreeTool 
 `,
@@ -94,25 +100,14 @@ parameters:
           absolute file path to the file destination choose from ReadProjectTreeTool result
           example : "/src/component/first.txt"
         `),
-      operation: z.enum(["Create", "Update"]),
     }),
   },
 );
 
 export const modelTools = [
   ReadProjectTreeTool,
-  CreateUpdateFile,
+  CreateFile,
   getWeatherTool,
   UpdateFileTool,
   ShellCommandExecutor,
 ];
-
-//     // const safeCommand = `Get-ChildItem -Path "${rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
-//     const safeCommand = `Set-Content -Path "${absoluteFilePath}" -Value @"
-//     ${content}
-// "@`;
-//     if (runtime.writer) {
-//       runtime.writer("Scanning the project explore...");
-//     }
-//     const result = await asyncExecPowerShell(safeCommand, rootDir);
-//     return result;

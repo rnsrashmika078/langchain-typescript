@@ -1,49 +1,14 @@
 import { GraphNode } from "@langchain/langgraph";
-import { graph2 } from "../schemas/graphSchema";
+import { graph1, graph2 } from "../schemas/graphSchema";
 import { graphLanguageModel } from "@/app/agents/languageModel";
 import {
   CommandStructuredOutput,
   updateContentStructuredOutput,
 } from "../schemas/structuredOutputSchema";
 import { execFile } from "child_process";
-import { powershellDoc } from "@/markdown/markdown";
+import { powershellDoc, stdProjectTree } from "@/markdown/markdown";
 import { writeFileSync } from "fs";
 import path from "path";
-
-// Node: => Find a path
-export const getCommand: GraphNode<typeof graph2> = async (state, config) => {
-  if (config.writer) {
-    config.writer({ message: "Requesting Powershell command..." });
-  }
-
-  let prompt = "";
-
-  prompt = `
-  DECIDE SUITABLE POWERSHELL COMMAND BASED ON USER TASK, PROJECT FILE TREE AND POWERSHELL DOCUMENTATION
-
-  You MUST return ONLY valid JSON.
-
-  Output format:
-{"command": "string"}
-
-  TASK:${state.task}
-  POWERSHELL DOCUMENTATION: ${powershellDoc}
-  PROJECT FILE TREE: ${state.fileTree}
-  CURRENT WORKING DIRECTORY: ${state.rootDir}
-
-
-   Rules:
-    - Only return valid JSON
-    - No explanations
-    - No extra text
-`;
-  // CURRENT WORKING DIRECTORY: ${state.rootDir}
-  const structuredLlm = graphLanguageModel.withStructuredOutput(
-    CommandStructuredOutput,
-  );
-  const result = await structuredLlm.invoke(prompt);
-  return { command: result.command };
-};
 
 export const readFileTree: GraphNode<typeof graph2> = async (state, config) => {
   if (config.writer) {
@@ -63,7 +28,7 @@ export const readFileTree: GraphNode<typeof graph2> = async (state, config) => {
     );
   });
 };
-export const readFile: GraphNode<typeof graph2> = async (state, config) => {
+export const readFile: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Reading file paths...." });
   }
@@ -81,12 +46,61 @@ ForEach-Object {
       ["-Command", safeCommand],
       { cwd: state.rootDir },
       (error, stdout, stderr) => {
+        if (stderr) {
+          resolve({ content: stderr });
+        }
+        console.log("Content", stdout);
         resolve({ content: stdout });
       },
     );
   });
 };
-export const updateFile: GraphNode<typeof graph2> = async (state, config) => {
+export const updateFile: GraphNode<typeof graph1> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Updating file paths...." });
+  }
+  let prompt = "";
+  prompt = `
+ YOU ARE AN EXPERT REACT VITE DEVELOPER.
+
+You MUST return ONLY valid JSON.
+
+STANDARD REACT VITE FOLDER STRUCTURE:
+${stdProjectTree}
+
+TASK:
+${state.task}
+
+OLD FILE CONTENT:
+${state.content}
+
+
+RULES:
+- DO NOT REWRITE THE ENTIRE FILE
+- CONSIDER STANDARD REACT VITE FOLDER STRUCTURE ( STRICTLY FOLLOW THIS STRUCTURE )
+- ONLY MODIFY MINIMUM REQUIRED PARTS
+- PRESERVE ALL UNRELATED CODE EXACTLY AS IS
+- DO NOT REMOVE EXISTING FUNCTIONS OR IMPORTS unless required
+- ACT LIKE A CODE PATCH SYSTEM, NOT A GENERATOR
+
+OUTPUT FORMAT:
+{
+  "content": "full updated file content",
+  "absoluteFilePath": "string"
+}
+
+- Only valid JSON
+- No explanations
+- No extra text
+`;
+  // CURRENT WORKING DIRECTORY: ${state.rootDir}
+  const structuredLlm = graphLanguageModel.withStructuredOutput(
+    updateContentStructuredOutput,
+  );
+  const result = await structuredLlm.invoke(prompt);
+  return { content: result.content, absoluteFilePath: result.filePath };
+};
+export const fixError: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Updating file paths...." });
   }
@@ -95,10 +109,10 @@ export const updateFile: GraphNode<typeof graph2> = async (state, config) => {
   YOU ARE EXPERT REACT VITE DEVELOPER
   You MUST return ONLY valid JSON.
 
-  BASE ON THE TASK MODIFY/UPDATE THE CODE/CONTENT
+  PLEASE FIX THE ERROR OF GIVEN CODE
 
-  TASK:${state.task}
-  CONTENT TO BE UPDATE OR MODIFIED:${state.content}
+  ERROR : ${state.error}
+  OLD CONTENT OF THE FILE  :${state.content}
 
   Output format:
   {"content": "string", "absoluteFilePath:"string"}
@@ -115,17 +129,21 @@ export const updateFile: GraphNode<typeof graph2> = async (state, config) => {
   const result = await structuredLlm.invoke(prompt);
   return { content: result.content, absoluteFilePath: result.filePath };
 };
-export const finishUpdate: GraphNode<typeof graph2> = async (state, config) => {
+export const finishUpdate: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Updating file paths...." });
   }
-  const dirModified = state.absoluteFilePath.includes("C:")
-    ? state.absoluteFilePath
-    : path.join(state.rootDir, state.absoluteFilePath);
-  console.log("file absolute path: ", state.absoluteFilePath);
-  console.log("file content: ", state.content);
-  writeFileSync(dirModified, state.content, "utf-8");
-  console.log("file modified path: ", dirModified);
 
-  return { content: "Success" };
+  try {
+    const dirModified = state.absoluteFilePath.includes("C:")
+      ? state.absoluteFilePath
+      : path.join(state.rootDir, state.absoluteFilePath);
+    writeFileSync(dirModified, state.content, "utf-8");
+    return { status: state.operation };
+  } catch (err) {
+    return {
+      status:
+        err instanceof Error ? err.message : "error while write in file sync",
+    };
+  }
 };

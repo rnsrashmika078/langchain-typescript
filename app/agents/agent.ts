@@ -17,7 +17,7 @@ export const mainAgent = createAgent({
 
   // stateSchema: AgentState,
   middleware: [
-    // trimMessages,
+    trimMessages,
     humanInTheLoopMiddleware({
       interruptOn: {
         CreateFileTool: {

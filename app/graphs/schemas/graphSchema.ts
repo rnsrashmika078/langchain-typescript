@@ -13,16 +13,19 @@ export const graph2 = new StateSchema({
   absoluteFilePath: z.string(),
   fileTree: z.any(),
   powershellDoc: z.string(),
-  decision: z.string(),
   content: z.string(),
 });
 // Graph 1 state
 export const graph1 = new StateSchema({
   task: z.string(),
+  error: z.string().nullish(),
   fileName: z.string(),
   rootDir: z.string(),
   content: z.string(),
   fileTree: z.string(),
   absoluteFilePath: z.string(),
+  decision: z.string(),
   command: z.string(),
+  status: z.string(),
+  operation: z.enum(["READ", "UPDATE", "FIXERROR", "DELETE"]),
 });
