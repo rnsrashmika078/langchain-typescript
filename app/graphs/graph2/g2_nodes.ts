@@ -55,7 +55,7 @@ ForEach-Object {
     );
   });
 };
-export const updateFile: GraphNode<typeof graph2> = async (state, config) => {
+export const updateFile: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Updating file paths...." });
   }
@@ -84,7 +84,36 @@ export const updateFile: GraphNode<typeof graph2> = async (state, config) => {
   const result = await structuredLlm.invoke(prompt);
   return { content: result.content, absoluteFilePath: result.filePath };
 };
-export const finishUpdate: GraphNode<typeof graph2> = async (state, config) => {
+export const fixError: GraphNode<typeof graph1> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Updating file paths...." });
+  }
+  let prompt = "";
+  prompt = `
+  YOU ARE EXPERT REACT VITE DEVELOPER
+  You MUST return ONLY valid JSON.
+
+  BASE ON THE TASK MODIFY/UPDATE THE CODE/CONTENT
+
+  ERROR : ${state.error}
+  OLD CONTENT OF THE FILE  :${state.content}
+
+  Output format:
+  {"content": "string", "absoluteFilePath:"string"}
+
+   Rules:
+    - Only return valid JSON
+    - No explanations
+    - No extra text
+`;
+  // CURRENT WORKING DIRECTORY: ${state.rootDir}
+  const structuredLlm = graphLanguageModel.withStructuredOutput(
+    updateContentStructuredOutput,
+  );
+  const result = await structuredLlm.invoke(prompt);
+  return { content: result.content, absoluteFilePath: result.filePath };
+};
+export const finishUpdate: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Updating file paths...." });
   }

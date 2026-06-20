@@ -25,6 +25,8 @@ export const graph1 = new StateSchema({
   fileTree: z.string(),
   absoluteFilePath: z.string(),
   decision: z.string(),
+  status: z.string(),
   command: z.string(),
+  operation: z.enum(["READ", "UPDATE", "DELETE", "FIXERROR"]),
 });
 // accept undefined or null when missing
