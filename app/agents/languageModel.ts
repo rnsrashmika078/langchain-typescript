@@ -5,9 +5,13 @@ export const languageModel = new ChatOllama({
   think: schema.languageModel.reasoning,
   temperature: schema.languageModel.temperature,
 });
-
 export const graphLanguageModel = new ChatOllama({
   model: schema.languageModel.graphLanguageModel.model,
   think: schema.languageModel.graphLanguageModel.reasoning,
   temperature: schema.languageModel.graphLanguageModel.temperature,
+});
+export const codingModel = new ChatOllama({
+  model: schema.languageModel.codingModel.model,
+  think: schema.languageModel.codingModel.reasoning,
+  temperature: schema.languageModel.codingModel.temperature,
 });

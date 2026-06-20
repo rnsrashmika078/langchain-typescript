@@ -1,118 +1,246 @@
 import { GraphNode } from "@langchain/langgraph";
-import { graph2 } from "../schemas/graphSchema";
-import { graphLanguageModel } from "@/app/agents/languageModel";
-import { createFileStructureOutput } from "../schemas/structuredOutputSchema";
-import { powershellDoc, stdProjectTree } from "@/markdown/markdown";
+import { graph1 } from "../schemas/graphSchema";
+import { codingModel, graphLanguageModel } from "@/app/agents/languageModel";
+import { updateContentStructuredOutput } from "../schemas/structuredOutputSchema";
+import { execFile } from "child_process";
+import { mkdirSync, writeFileSync } from "fs";
+import path, { dirname } from "path";
 
-export const generateFileContent: GraphNode<typeof graph2> = async (
-  state,
-  config,
-) => {
+export const readFile: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
-    config.writer({ message: "Reading file tree...." });
+    config.writer({ message: "Reading file paths...." });
   }
 
-  let prompt = "";
-  prompt = `
-  YOU ARE EXPERT REACT VITE DEVELOPER
-
-  YOUR ROLE: 
-    1. GENERATE FILE CONTENT BASED ON USER GIVEN TASK
-    2. READ THE STANDARD REACT VITE PROJECT TREE
-    3. PICK SUITABLE ABSOLUTE FILE PATH BY READING FILE TREE
-    4. READ THE POWERSHELL DOCUMENTATION
-
-  TASK: ${state.task}
-
-  STANDARD REACT PROJECT TREE: ${stdProjectTree}
-
-  POWERSHELL DOCUMENTATION: ${powershellDoc}
-  FILE TREE: ${state.fileTree}
-  
-  You MUST return ONLY valid JSON.
-
-  Output format:
-  {absoluteFilePath: "string" , "content": "string",  "command":"string"}
-
-  e.g: absoluteFilePath -> "C:/users/rashm/project01/src/component/filename.tsx"
-
-  Rules:
-    - Only return valid JSON
-    - No explanations
-    - No extra text
-`;
-  const structuredLlm = graphLanguageModel.withStructuredOutput(
-    createFileStructureOutput,
-  );
-  const result = await structuredLlm.invoke(prompt);
-  //   const command = `
-  // @"
-  // ${result.content}
-  // "@ | Set-Content -Path "${result.absoluteFilePath}"
-  // `;
-  return { command: result.command };
+  const safeCommand = `Get-ChildItem -Path "${state.rootDir}" -Filter "${state.fileName}" -Recurse -ErrorAction SilentlyContinue |
+Where-Object { $_.FullName -notmatch "node_modules" } |
+ForEach-Object {
+    "---- $($_.FullName) ----"
+    Get-Content $_.FullName
+}`;
+  return new Promise((resolve) => {
+    execFile(
+      "powershell",
+      ["-Command", safeCommand],
+      { cwd: state.rootDir },
+      (error, stdout, stderr) => {
+        if (stderr) {
+          resolve({ content: stderr });
+        }
+        console.log("Content", stdout);
+        resolve({ content: stdout });
+      },
+    );
+  });
 };
-export const createFileResources: GraphNode<typeof graph2> = async (
-  state,
-  config,
-) => {
+export const updateFile: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
-    config.writer({ message: "Reading file tree...." });
+    config.writer({ message: "Updating file paths...." });
   }
+  const prompt = `
+You are a React + Vite expert.
 
-  console.log("file tree", state.fileTree);
+You MUST update ONLY ONE file.
 
-  const defaultCode = `import 'react' from react;
-  
-    const page = () => {
-     return <div>"hi there"</div>
-    }
+STRICT RULES:
+- DO NOT create new components in this file
+- DO NOT include code for other files
+- DO NOT add comments like "// src/components/..."
+- DO NOT generate multiple components in one file
+- DO NOT move code to other files
+- ONLY modify the existing component in this file
 
-    export default page;
-  `;
+FILE TO UPDATE:
+${state.absoluteFilePath}
 
-  let prompt = "";
-  prompt = `
-  YOU ARE REACT VITE CODING AGENT
-  YOUR TASKS LISTED BELOW:
-  
-    #TASK 01 -
-      DECIDE SUITABLE PATH BASED ON THE FILE TREE AND TASK FOR REACT VITE PROJECT
-    #TASK 02 -
-      GENERATE CONTENT SUITABLE FOR THE FILE: default -> ${defaultCode}
-    #TASK 03 -
-      ${state.task}
+TASK:
+${state.task}
 
-  FILE TREE:
-  ${state.fileTree}
+OLD CONTENT:
+${state.content}
 
-  FILE NAME ( Name that set to file that we going to create):
-  ${state.fileOrFolderName}
+OUTPUT RULES:
+- Return ONLY valid JSON
+- No explanations
+- No extra text
+- Return FULL updated content
+- Keep structure same unless explicitly required
 
-  You MUST return ONLY valid JSON.
-
-  Output format:
-  {"absoluteFilePath": "string" , "content: "string"}
-
-  e.g: absoluteFilePath -> "C:/users/rashm/project01/src/component/filename.tsx"
-
-   Rules:
-    - Only return valid JSON
-    - No explanations
-    - No extra text
+FORMAT:
+{"content":"string","absoluteFilePath":"string"}
 `;
   const structuredLlm = graphLanguageModel.withStructuredOutput(
-    createFileStructureOutput,
+    updateContentStructuredOutput,
   );
+  const result = await structuredLlm.invoke(prompt);
+  console.log(
+    "==================================================================",
+  );
+  console.log("UPDATE FILE");
+  console.log(
+    "==================================================================",
+  );
+  return { content: result.content, absoluteFilePath: result.filePath };
+};
+export const createFile: GraphNode<typeof graph1> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Updating file paths...." });
+  }
+  const prompt = `
+You are a React + Vite expert.
+Generate the content based on given task
 
+CONSIDER BELOW  BEST PRACTICES AS WELL
+ 
+BEST PRACTICES
+------------------
+REACT + VITE:
+- Use functional components only.
+- Must be minimal code as well
+- Each component must be separate file
+- Always use TypeScript (.ts/.tsx).
+- Keep components small, reusable, and strongly typed.
+- Avoid inline logic inside JSX (move logic above return).
+- Use hooks properly (useState, useEffect, custom hooks).
+- Never mutate state directly.
+- Use strict typing for props, state, and events.
+- Keep file structure modular (components/, pages/, hooks/).
+
+TAILWIND CSS STYLING RULES:
+- Use Tailwind CSS for all styling (no CSS files unless necessary).
+- Prefer utility classes over custom CSS.
+- Avoid inline styles (style={{}}) unless dynamic edge case.
+- Use className composition for conditional styling.
+- Keep class names readable (use clsx or cn helper if needed).
+- Maintain consistent spacing, typography, and responsive design using Tailwind utilities.
+
+PERFORMANCE RULES:
+- Avoid unnecessary re-renders.
+- Use React.memo, useCallback, useMemo when required.
+- Split large components into smaller ones.
+- Lazy load pages/components when possible.
+
+TASK:
+${state.task}
+
+
+Rules:
+- Return ONLY valid JSON
+- No explanations or extra text
+- Return FULL updated content (not partial)
+- Keep existing working code, change only what is needed
+
+Format:
+{"content":"string","absoluteFilePath":"string"}
+`;
+  const structuredLlm = graphLanguageModel.withStructuredOutput(
+    updateContentStructuredOutput,
+  );
   const result = await structuredLlm.invoke(prompt);
 
-  const command = `
-  @"
-  ${result.content ?? defaultCode}
-"@ | Set-Content -Path "${result.absoluteFilePath}"
-  `;
+  console.log(
+    "==================================================================",
+  );
+  console.log("CREATEING FILE");
+  console.log(
+    "==================================================================",
+  );
+  return { content: result.content, absoluteFilePath: result.filePath };
+};
+// export const checkIfExist: GraphNode<typeof graph1> = async (state, config) => {
+//   if (config.writer) {
+//     config.writer({ message: "Updating file paths...." });
+//   }
 
-  console.log("command", command);
-  return { command };
+//   return { content: result.content, absoluteFilePath: result.filePath };
+// };
+export const fixError: GraphNode<typeof graph1> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Fixing error file paths...." });
+  }
+  const prompt = `
+You are a React + Vite expert.
+Fix the error in the given code.
+
+
+CONSIDER BELOW  BEST PRACTICES AS WELL
+ 
+BEST PRACTICES
+------------------
+REACT + VITE:
+- Use functional components only.
+- Always use TypeScript (.ts/.tsx).
+- Keep components small, reusable, and strongly typed.
+- Avoid inline logic inside JSX (move logic above return).
+- Use hooks properly (useState, useEffect, custom hooks).
+- Never mutate state directly.
+- Use strict typing for props, state, and events.
+- Keep file structure modular (components/, pages/, hooks/).
+
+TAILWIND CSS STYLING RULES:
+- Use Tailwind CSS for all styling (no CSS files unless necessary).
+- Prefer utility classes over custom CSS.
+- Avoid inline styles (style={{}}) unless dynamic edge case.
+- Use className composition for conditional styling.
+- Keep class names readable (use clsx or cn helper if needed).
+- Maintain consistent spacing, typography, and responsive design using Tailwind utilities.
+
+PERFORMANCE RULES:
+- Avoid unnecessary re-renders.
+- Use React.memo, useCallback, useMemo when required.
+- Split large components into smaller ones.
+- Lazy load pages/components when possible.
+
+ERROR:
+${state.error}
+
+CODE:
+${state.content}
+
+Rules:
+- Return ONLY valid JSON
+- No explanation, no extra text
+- Always return FULL updated code
+- Do minimal changes to fix error
+- Keep existing working code
+
+Format:
+{"content":"string","absoluteFilePath":"string"}
+`;
+  const structuredLlm = graphLanguageModel.withStructuredOutput(
+    updateContentStructuredOutput,
+  );
+  const result = await structuredLlm.invoke(prompt);
+  return { content: result.content, absoluteFilePath: result.filePath };
+};
+export const finishUpdate: GraphNode<typeof graph1> = async (state, config) => {
+  if (config.writer) {
+    config.writer({ message: "Updating file paths...." });
+  }
+  console.log("content", state.absoluteFilePath);
+
+  try {
+    const dirModified = path.isAbsolute(state.absoluteFilePath)
+      ? state.absoluteFilePath
+      : path.join(state.rootDir, state.absoluteFilePath);
+    mkdirSync(dirname(dirModified), { recursive: true });
+
+    writeFileSync(dirModified, state.content, "utf-8");
+    console.log(
+      "==================================================================",
+    );
+    console.log("Finish Update");
+    console.log(
+      "==================================================================",
+    );
+
+    console.log("dirModified", dirModified);
+    console.log("content", state.content);
+
+    return { ...state, status: state.operation };
+  } catch (err) {
+    return {
+      status:
+        err instanceof Error ? err.message : "error while write in file sync",
+    };
+  }
 };

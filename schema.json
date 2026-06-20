@@ -7,6 +7,11 @@
       "model": "gemma4:e2b",
       "reasoning": false,
       "temperature": 0
+    },
+    "codingModel": {
+      "model": "deepseek-coder:6.7b",
+      "reasoning": false,
+      "temperature": 0
     }
   }
 }

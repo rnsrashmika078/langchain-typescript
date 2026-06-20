@@ -35,9 +35,9 @@ export const UpdateFileTool = tool(
       const rootDir = config?.configurable?.rootPath;
       const error = config?.configurable?.error;
       const graph = new StateGraph(graph1)
-        .addNode("readFile", readFile)
-        .addNode("createFile", createFile)
-        .addNode("updateFile", updateFile)
+        .addNode("create_project", readFile)
+        .addNode("install_deps", createFile)
+        .addNode("run_project", updateFile)
         .addNode("checkExistent", async () => {})
         .addNode("fixError", fixError)
         .addNode("finishUpdate", finishUpdate)

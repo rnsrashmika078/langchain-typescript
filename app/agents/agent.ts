@@ -9,9 +9,7 @@ import { AgentState } from "../agent_middleware";
 import z from "zod";
 import {
   createDeepAgent,
-  createFilesystemMiddleware,
   FilesystemBackend,
-  StateBackend,
 } from "deepagents";
 const checkpointer = await getPostgressCheckpointer();
 
@@ -20,14 +18,13 @@ const targetDir = "C:/Users/Rashm/Desktop/VIRTUAL"; // Avoid OneDrive
 export const mainAgent = createAgent({
   model: languageModel,
   systemPrompt: mainAgentSystemPrompt,
-  // systemPrompt: mainAgentSystemPrompt,
-  // tools: modelTools,
-
+  tools: modelTools,
   // stateSchema: AgentState,
   middleware: [
-    // trimMessages,
+    trimMessages,
     humanInTheLoopMiddleware({
       interruptOn: {
+        
         CreateFileTool: {
           allowedDecisions: ["approve", "reject"],
           description: "Execute this command?",

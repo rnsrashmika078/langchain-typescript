@@ -14,6 +14,7 @@ export async function POST(req: Request) {
       configurable: {
         thread_id,
         rootPath: body.input.rootPath,
+        referenceFile: body.input.referenceFile,
       },
     };
     await prismaUpsert(thread_id);

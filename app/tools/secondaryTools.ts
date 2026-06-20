@@ -4,7 +4,6 @@ import { mkdirSync, writeFileSync } from "fs";
 import { tool, ToolRuntime } from "langchain";
 import * as z from "zod";
 // import { getWeatherTool, shellTool } from "./primaryTools";
-import path, { dirname } from "path";
 import { getWeatherTool, ShellCommandExecutor } from "./primaryTools";
 import path, { dirname } from "path";
 import { UpdateFileTool } from "../graphs/graph1/FileMutationCommandGenerator";
@@ -83,9 +82,9 @@ export const CreateFile = tool(
     }
   },
   {
-    name: "CreateFile",
+    name: "create_simple_file",
     description: `
-create file/files 
+use to create file/files that not need much priority and not related to sequence of process
 
 parameters: 
   content,
@@ -106,14 +105,12 @@ parameters:
     }),
   },
 );
-export const runSubAgent = tool(
+export const checkFileAttachment = tool(
   async (
     {
-      absoluteFilePath,
-      content,
+      task,
     }: {
-      absoluteFilePath: string;
-      content: string;
+      task: string;
     },
     config: ToolRuntime,
   ) => {
@@ -123,34 +120,27 @@ export const runSubAgent = tool(
       if (writer) {
         writer("Generating files...");
       }
-      const rootDir = config?.configurable?.rootPath;
-      return {
-        success: true,
-        message: `Files Created successfully`,
-      };
+      const referenceFile = config?.configurable?.referenceFile;
+      if (!referenceFile) {
+        return `no reference file found`;
+      }
+
+      return `reference file found: ${JSON.stringify(referenceFile)}`;
     } catch (error) {
       return `error while creating files ${error instanceof Error && error.message}`;
     }
   },
   {
-    name: "CreateFile",
+    name: "checkFileAttachment",
     description: `
-create file/files 
-
+check weather the reference file found or not
 parameters: 
-  content,
-  absoluteFilePath
+  task
 
-    NEVER ASSUME THE FILE PATH. instead run ReadProjectTreeTool 
 `,
     schema: z.object({
-      content: z.string().describe(`
-          file content
-        `),
-      absoluteFilePath: z.string().describe(`
-          absolute file path to the file destination choose from ReadProjectTreeTool result
-          example : "/src/component/first.txt"
-        `),
+      task: z.string().describe(`
+describe the task in 2 words `),
     }),
   },
 );
@@ -159,6 +149,7 @@ export const modelTools = [
   ReadProjectTreeTool,
   CreateFile,
   getWeatherTool,
-  UpdateOrErrorFixFileTool,
+  UpdateFileTool,
   ShellCommandExecutor,
+  checkFileAttachment,
 ];
