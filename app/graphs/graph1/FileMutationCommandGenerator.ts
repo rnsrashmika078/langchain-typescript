@@ -1,12 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { tool, ToolRuntime } from "langchain";
-import {
-  ConditionalEdgeRouter,
-  END,
-  GraphNode,
-  START,
-  StateGraph,
-} from "@langchain/langgraph";
+import { END, START, StateGraph } from "@langchain/langgraph";
 import { graph1 } from "../schemas/graphSchema";
 import {
   createFile,
@@ -18,6 +12,8 @@ import {
 import z from "zod";
 
 import { routeDecision, routeDecision_II } from "./router";
+import { findProjectRoot } from "@/app/helper";
+
 export const UpdateFileTool = tool(
   async (
     {
@@ -33,6 +29,7 @@ export const UpdateFileTool = tool(
   ) => {
     try {
       const rootDir = config?.configurable?.rootPath;
+      const rootDirectory = findProjectRoot(rootDir);
       const error = config?.configurable?.error;
       const graph = new StateGraph(graph1)
         .addNode("readFile", readFile)
@@ -61,7 +58,7 @@ export const UpdateFileTool = tool(
         .compile();
 
       const inputs = {
-        rootDir,
+        rootDir: rootDirectory ?? undefined,
         task,
         fileName,
         error,
@@ -88,7 +85,7 @@ export const UpdateFileTool = tool(
       }
       // const state = graph.invoke(inputs);
 
-      return { content: full_state.content, updates };
+      return { content: full_state.content };
     } catch (error) {
       return `error while performing the action ${error instanceof Error && error.message}`;
     }

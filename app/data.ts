@@ -75,6 +75,8 @@ React Vite coding agent.
 TECH STACK -> REACT + VITE + NPM + TAILWIND + TYPESCRIPT
 
 
+
+
 CRITICAL RULES:
 
 - STRICT SEQUENTIAL EXECUTION: Only ONE tool call per response.

@@ -50,7 +50,7 @@ STRICT RULES:
 - ONLY modify the existing component in this file
 
 FILE TO UPDATE:
-${state.absoluteFilePath}
+${state.relativeFilePath}
 
 TASK:
 ${state.task}
@@ -66,7 +66,7 @@ OUTPUT RULES:
 - Keep structure same unless explicitly required
 
 FORMAT:
-{"content":"string","absoluteFilePath":"string"}
+{"content":"string","relativeFilePath":"string"}
 `;
   const structuredLlm = graphLanguageModel.withStructuredOutput(
     updateContentStructuredOutput,
@@ -79,7 +79,7 @@ FORMAT:
   console.log(
     "==================================================================",
   );
-  return { content: result.content, absoluteFilePath: result.filePath };
+  return { content: result.content, relativeFilePath: result.filePath };
 };
 export const createFile: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
@@ -140,7 +140,7 @@ Format:
   console.log(
     "==================================================================",
   );
-  console.log("CREATEING FILE");
+  console.log("CREATING FILE");
   console.log(
     "==================================================================",
   );
@@ -163,7 +163,7 @@ Fix the error in the given code.
 
 
 CONSIDER BELOW  BEST PRACTICES AS WELL
- 
+
 BEST PRACTICES
 ------------------
 REACT + VITE:
@@ -204,27 +204,29 @@ Rules:
 - Keep existing working code
 
 Format:
-{"content":"string","absoluteFilePath":"string"}
+{"content":"string","relativeFilePath":"string"}
 `;
   const structuredLlm = graphLanguageModel.withStructuredOutput(
     updateContentStructuredOutput,
   );
   const result = await structuredLlm.invoke(prompt);
-  return { content: result.content, absoluteFilePath: result.filePath };
+  return { content: result.content, relativeFilePath: result.filePath };
 };
 export const finishUpdate: GraphNode<typeof graph1> = async (state, config) => {
   if (config.writer) {
     config.writer({ message: "Updating file paths...." });
   }
-  console.log("content", state.absoluteFilePath);
+  console.log("content", state.relativeFilePath);
 
   try {
-    const dirModified = path.isAbsolute(state.absoluteFilePath)
-      ? state.absoluteFilePath
-      : path.join(state.rootDir, state.absoluteFilePath);
-    mkdirSync(dirname(dirModified), { recursive: true });
+    const dirModified = path.isAbsolute(state.relativeFilePath)
+      ? state.relativeFilePath
+      : path.join(state.rootDir, state.relativeFilePath);
+    const createdPath = mkdirSync(dirname(dirModified), { recursive: true });
 
-    writeFileSync(dirModified, state.content, "utf-8");
+    writeFileSync(dirModified, state.content || "", "utf-8");
+    console.log("successive path", createdPath);
+    // writeFileSync(dirModified, state.content, "utf-8");
     console.log(
       "==================================================================",
     );

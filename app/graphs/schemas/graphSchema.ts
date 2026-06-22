@@ -9,7 +9,7 @@ export const graph1 = new StateSchema({
   rootDir: z.string(),
   content: z.string(),
   fileTree: z.string(),
-  absoluteFilePath: z.string(),
+  relativeFilePath: z.string(),
   decision: z.string(),
   status: z.string(),
   command: z.string(),
