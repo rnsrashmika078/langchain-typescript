@@ -1,7 +1,11 @@
-import { createAgent, humanInTheLoopMiddleware } from "langchain";
+import {
+  createAgent,
+  humanInTheLoopMiddleware,
+  todoListMiddleware,
+} from "langchain";
 import { trimMessages } from "../agent_middleware";
 import { getPostgressCheckpointer } from "../memory/memorySavers";
-import { mainAgentSystemPrompt } from "../data";
+import { mainAgentSystemPrompt, systemPromptTest } from "../data";
 import { graphLanguageModel, languageModel } from "./languageModel";
 import { modelTools } from "../tools/secondaryTools";
 import { AgentState } from "../agent_middleware";
@@ -13,11 +17,13 @@ const targetDir = "C:/Users/Rashm/Desktop/VIRTUAL"; // Avoid OneDrive
 
 export const mainAgent = createAgent({
   model: languageModel,
-  systemPrompt: mainAgentSystemPrompt,
+  systemPrompt: systemPromptTest,
   tools: modelTools,
   // stateSchema: AgentState,
   middleware: [
-    trimMessages,
+    // filesys
+    // trimMessages,
+    // todoListMiddleware(),
     humanInTheLoopMiddleware({
       interruptOn: {
         CreateFileTool: {

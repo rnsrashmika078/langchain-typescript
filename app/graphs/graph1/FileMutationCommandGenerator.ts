@@ -79,7 +79,7 @@ export const UpdateFileTool = tool(
         } else if (mode === "custom") {
           if (config.writer) {
             custom = chunk;
-            config.writer(custom.message);
+            config.writer({ message: custom.message, id: custom.id });
           }
         }
       }
@@ -91,7 +91,7 @@ export const UpdateFileTool = tool(
     }
   },
   {
-    name: "FileModifier",
+    name: "FileModifier&ErrorFixer",
     description: `
 
           Read and update file/files content ( PLANNER ONLY )

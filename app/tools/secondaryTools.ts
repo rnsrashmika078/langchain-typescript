@@ -9,6 +9,8 @@ import { tool, ToolRuntime } from "langchain";
 import * as z from "zod";
 import path, { dirname } from "path";
 import { UpdateFileTool } from "../graphs/graph1/FileMutationCommandGenerator";
+import { TavilySearch } from "@langchain/tavily";
+
 export const getWeatherTool = tool(
   async (
     {
@@ -20,9 +22,10 @@ export const getWeatherTool = tool(
   ) => {
     try {
       const writer = config.writer;
+      const messageId = config?.configurable?.messageId;
 
       if (writer) {
-        writer("Calling Weather Tool...");
+        writer({ message: "Calling Weather Tool...", id: messageId });
       }
       const result = await requestWeatherAPI(city);
 
@@ -59,6 +62,7 @@ export const ReadProjectTreeTool = tool(
   ) => {
     try {
       const rootDir = config?.configurable?.rootPath;
+      const messageId = config?.configurable?.messageId;
       // const safeCommand = `Get-ChildItem -Path "${rootDir}"  -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }`;
 
       const safeCommand = `
@@ -69,7 +73,7 @@ Select-Object -ExpandProperty FullName
       const writer = config.writer;
 
       if (writer) {
-        writer("Scanning the project explore...");
+        writer({ message: "Scanning the project explore...", id: messageId });
       }
       const result = await asyncExecPowerShell(safeCommand, rootDir);
       return result;
@@ -103,6 +107,8 @@ export const CreateFile = tool(
     try {
       const writer = config.writer;
       const rootDir = config?.configurable?.rootPath;
+      const messageId = config?.configurable?.messageId;
+
       const rootDirectory = findProjectRoot(rootDir);
       if (!rootDirectory)
         return {
@@ -111,7 +117,7 @@ export const CreateFile = tool(
       console.log("project path", rootDirectory);
 
       if (writer) {
-        writer("Generating files...");
+        writer({ message: "Generating files...", id: messageId });
       }
       // const rootDir = config?.configurable?.rootPath;
       const dirModified = absoluteFilePath.includes("C:")
@@ -163,13 +169,16 @@ export const checkFileAttachment = tool(
   ) => {
     try {
       const writer = config.writer;
+      const messageId = config?.configurable?.messageId;
 
       if (writer) {
-        writer("Generating files...");
+        writer({ message: "Checking attached files...", id: messageId });
       }
       const referenceFile = config?.configurable?.referenceFile;
+      const error = config?.configurable?.error;
+
       if (!referenceFile) {
-        return `no reference file found`;
+        return `Found Error:${error}. Now i will fix it using FileModifier&ErrorFixer tool`;
       }
 
       return `reference file found: ${JSON.stringify(referenceFile)}`;
@@ -180,9 +189,18 @@ export const checkFileAttachment = tool(
   {
     name: "checkFileAttachment",
     description: `
-check weather the reference file found or not
+check weather the reference file found or not on vague prompt 
 parameters: 
   task
+
+  FLOW :
+  run this tool first to read attached files
+  then run FileModifier&ErrorFixer tool
+
+
+  example vague prompt: 
+    "fix this error"
+    "try to solve error in this file"
 
 `,
     schema: z.object({
@@ -195,27 +213,25 @@ export const ShellCommandExecutor = tool(
   async (
     {
       command,
-      // purpose,
-      // path,
     }: {
       command: string;
-      // purpose: "install" | "run" | "check" | "info" | "create";
-      // path: string;
     },
-    runtime: ToolRuntime,
+    config: ToolRuntime,
   ) => {
-    const rootPath = runtime?.configurable?.rootPath;
+    const rootPath = config?.configurable?.rootPath;
+    const messageId = config?.configurable?.messageId;
+
+    console.log("Message Id from shell command exec", messageId);
+    console.log("rootPath from shell command exec", rootPath);
     let modifiedCommand = "";
 
-    // if (runtime.writer) {
-    //   runtime.writer({ message: "Scanning the project explore..." });
-    // }
+    if (config.writer) {
+      config.writer({ message: "Executing command...", id: messageId });
+    }
 
-    if (!rootPath)
-      return {
-        result:
-          "You have currently doesn`t open any project, so you can't run shell commands that interact with file system.",
-      };
+    if (!rootPath) {
+      return "You have currently doesn`t open any project, so you can't run shell commands that interact with file system.";
+    }
 
     const projectRelativePath = findProjectRoot(rootPath);
 
@@ -228,9 +244,6 @@ export const ShellCommandExecutor = tool(
         ? command.split(" && ")[1]
         : command;
       modifiedCommand = `cd ${projectRelativePath}; if ($?) { ${mainCommand} }`;
-      // if (runtime.writer) {
-      //   runtime.writer({ message: "Executing powershell command..." });
-      // }
 
       return {
         message:
@@ -240,25 +253,26 @@ export const ShellCommandExecutor = tool(
     }
 
     if (command.includes("npm install") || command.includes("bun install")) {
+      if (config.writer) {
+        config.writer({ message: "Installing dependencies...", id: messageId });
+      }
       const mainCommand = command.includes(" && ")
         ? command.split(" && ")[1]
         : command;
       modifiedCommand = `cd ${projectRelativePath}; if ($?) { ${mainCommand} }`;
       const result = await asyncExecPowerShell(modifiedCommand, rootPath);
 
-      return { result };
+      return result;
     }
 
     if (command.includes("cd")) {
       modifiedCommand = command.replace(command, `cd ${projectRelativePath}`);
       const result = await asyncExecPowerShell(modifiedCommand, rootPath);
-      return { result };
+      return result;
     }
 
-    // if (purpose === "create") {
-    // }
     const result = await asyncExecPowerShell(command, rootPath);
-    return { result };
+    return result;
   },
   {
     name: "ShellCommandExecutor",
@@ -292,6 +306,35 @@ Output:
     }),
   },
 );
+export const internetSearch = tool(
+  async ({
+    query,
+    maxResults = 5,
+    includeRawContent = false,
+  }: {
+    query: string;
+    maxResults?: number;
+    topic?: "general" | "news" | "finance";
+    includeRawContent?: boolean;
+  }) => {
+    const tavilySearch = new TavilySearch({
+      maxResults,
+      tavilyApiKey: process.env.TAVILY_API_KEY,
+      includeRawContent,
+      // topic,
+    });
+    return await tavilySearch._call({ query });
+  },
+  {
+    name: "internet_search",
+    description: "Run a web search",
+    schema: z.object({
+      query: z.string().describe("The search query"),
+      maxResults: z.number().optional().default(5),
+      includeRawContent: z.boolean().optional().default(false),
+    }),
+  },
+);
 export const modelTools = [
   ReadProjectTreeTool,
   CreateFile,
@@ -299,4 +342,6 @@ export const modelTools = [
   UpdateFileTool,
   ShellCommandExecutor,
   checkFileAttachment,
+  // configureTailwind,
+  internetSearch,
 ];
