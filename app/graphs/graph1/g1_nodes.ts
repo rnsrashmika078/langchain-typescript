@@ -1,4 +1,4 @@
-import { GraphNode } from "@langchain/langgraph";
+import { GraphNode, interrupt } from "@langchain/langgraph";
 import { graph1 } from "../schemas/graphSchema";
 import { graphLanguageModel } from "@/app/agents/languageModel";
 import { updateContentStructuredOutput } from "../schemas/structuredOutputSchema";
@@ -12,11 +12,11 @@ export const readFile: GraphNode<typeof graph1> = async (state, config) => {
   }
 
   const safeCommand = `Get-ChildItem -Path "${state.rootDir}" -Filter "${state.fileName}" -Recurse -ErrorAction SilentlyContinue |
-Where-Object { $_.FullName -notmatch "node_modules" } |
-ForEach-Object {
-    "---- $($_.FullName) ----"
-    Get-Content $_.FullName
-}`;
+  Where-Object { $_.FullName -notmatch "node_modules" } |
+  ForEach-Object {
+      "---- $($_.FullName) ----"
+      Get-Content $_.FullName
+  }`;
   return new Promise((resolve) => {
     execFile(
       "powershell",
@@ -214,7 +214,6 @@ export const finishUpdate: GraphNode<typeof graph1> = async (state, config) => {
       ? state.relativeFilePath
       : path.join(state.rootDir, state.relativeFilePath);
     mkdirSync(dirname(dirModified), { recursive: true });
-
     writeFileSync(dirModified, state.content || "", "utf-8");
 
     return { ...state, status: state.operation };

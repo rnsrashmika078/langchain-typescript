@@ -8,9 +8,10 @@ export const graph1 = new StateSchema({
   error: z.string().nullish(),
   fileName: z.string(),
   rootDir: z.string(),
-  content: z.string(),
+  content: z.string().default(""),
   relativeFilePath: z.string(),
   status: z.string(),
+  approve: z.string(),
   operation: z.enum(["READ", "UPDATE", "DELETE", "FIXERROR"]),
 });
 export const graph2 = new StateSchema({
@@ -19,7 +20,7 @@ export const graph2 = new StateSchema({
   error: z.string().nullish(),
   fileName: z.string(),
   rootDir: z.string(),
-  content: z.string(),
+  content: z.string().default(""),
   relativeFilePath: z.string(),
   status: z.string(),
   operation: z.enum(["READ", "UPDATE", "DELETE", "FIXERROR"]),

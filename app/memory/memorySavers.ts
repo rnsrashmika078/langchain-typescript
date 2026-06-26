@@ -43,13 +43,15 @@ export async function getRedisCheckpointer() {
     refreshOnRead: true,
   });
 }
+// let checkpointer;
 export async function getPostgressCheckpointer() {
   const DB_URI =
     "postgresql://postgres:root@localhost:5432/postgres?sslmode=disable";
 
+  // if (!checkpointer) {
   const checkpointer = await PostgresSaver.fromConnString(DB_URI);
-
-  await checkpointer.setup(); // safe to include
+  await checkpointer.setup();
+  // }
 
   return checkpointer;
 }

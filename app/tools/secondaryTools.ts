@@ -10,6 +10,11 @@ import * as z from "zod";
 import path, { dirname } from "path";
 import { UpdateFileTool } from "../graphs/graph1/FileMutationCommandGenerator";
 import { TavilySearch } from "@langchain/tavily";
+import { graph1 } from "../graphs/schemas/graphSchema";
+import { Command } from "@langchain/langgraph";
+import { compiledGraph } from "../graphs/graph1/graph";
+import { threadId } from "worker_threads";
+import { AgentState } from "../agents/agent";
 
 export const getWeatherTool = tool(
   async (
@@ -226,7 +231,7 @@ export const ShellCommandExecutor = tool(
     let modifiedCommand = "";
 
     if (config.writer) {
-      config.writer({ message: "Executing command...", id: messageId });
+      config.writer({ message: "Executing command..." });
     }
 
     if (!rootPath) {
@@ -307,16 +312,22 @@ Output:
   },
 );
 export const internetSearch = tool(
-  async ({
-    query,
-    maxResults = 5,
-    includeRawContent = false,
-  }: {
-    query: string;
-    maxResults?: number;
-    topic?: "general" | "news" | "finance";
-    includeRawContent?: boolean;
-  }) => {
+  async (
+    {
+      query,
+      maxResults = 5,
+      includeRawContent = false,
+    }: {
+      query: string;
+      maxResults?: number;
+      topic?: "general" | "news" | "finance";
+      includeRawContent?: boolean;
+    },
+    config: ToolRuntime,
+  ) => {
+    if (config.writer) {
+      config.writer({ message: "Searching internet..." });
+    }
     const tavilySearch = new TavilySearch({
       maxResults,
       tavilyApiKey: process.env.TAVILY_API_KEY,
@@ -335,6 +346,105 @@ export const internetSearch = tool(
     }),
   },
 );
+export const toolA = tool(
+  async (
+    {
+      relativeFilePath,
+      rootDir,
+      content,
+      operation,
+    }: {
+      relativeFilePath: string;
+      rootDir: string;
+      content: string;
+      operation: string;
+    },
+    runtime: ToolRuntime<typeof graph1.State>,
+  ) => {
+    if (runtime.writer) {
+      runtime.writer({ message: "finishUp tool..." });
+    }
+
+    // const agentState = runtime.state;
+    // const threadId = runtime?.config?.configurable?.thread_id;
+
+    // const config = { configurable: { thread_id: threadId } };
+
+    // const state = await compiledGraph.getState(config);
+    // console.log("state:", state);
+
+    // // 3. Correct way to get the graph name
+    // const name = compiledGraph.getName();
+    // console.log("name:", name);
+
+    // const rootDir = await agentState?.rootDir;
+    // console.log("rootDir", rootDir);
+    // console.log("agentState", agentState);
+
+    const dirModified = path.isAbsolute(relativeFilePath)
+      ? relativeFilePath
+      : path.join(rootDir, relativeFilePath);
+    mkdirSync(dirname(dirModified), { recursive: true });
+    writeFileSync(dirModified, content || "", "utf-8");
+
+    return { status: operation };
+  },
+  {
+    name: "toolA",
+    description: "this tool run based on FileModifier&ErrorFixer tool result",
+    schema: z.object({
+      relativeFilePath: z
+        .string()
+        .describe("FileModifier&ErrorFixer tool return absolute file path "),
+      rootDir: z
+        .string()
+        .describe("FileModifier&ErrorFixer tool return root directory"),
+      content: z
+        .string()
+        .describe("FileModifier&ErrorFixer tool return content"),
+      operation: z
+        .string()
+        .describe("FileModifier&ErrorFixer tool return operation"),
+    }),
+  },
+);
+export const toolB = tool(
+  async (
+    {
+      query,
+    }: {
+      query: string;
+    },
+    runtime: ToolRuntime<typeof AgentState.State>,
+  ) => {
+    if (runtime.writer) {
+      runtime.writer({ message: "finishUp tool..." });
+    }
+
+    const agentState = runtime.state;
+    // const threadId = runtime?.config?.configurable?.thread_id;
+
+    // const config = { configurable: { thread_id: threadId } };
+
+    // const state = await compiledGraph.getState(config);
+    // console.log("state:", state);
+
+    // // 3. Correct way to get the graph name
+    // const name = compiledGraph.getName();
+    // console.log("name:", name);
+
+    const content = agentState?.content;
+    console.log("content", content);
+    return { content };
+  },
+  {
+    name: "toolB",
+    schema: z.object({
+      query: z.string().describe("The  query"),
+    }),
+  },
+);
+
 export const modelTools = [
   ReadProjectTreeTool,
   CreateFile,
@@ -343,5 +453,7 @@ export const modelTools = [
   ShellCommandExecutor,
   checkFileAttachment,
   // configureTailwind,
+  toolA,
+  toolB,
   internetSearch,
 ];

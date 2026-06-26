@@ -5,27 +5,33 @@ import {
 } from "langchain";
 import { trimMessages } from "../agent_middleware";
 import { getPostgressCheckpointer } from "../memory/memorySavers";
-import { mainAgentSystemPrompt, systemPromptTest } from "../data";
+import { mainAgentSystemPrompt } from "../data";
 import { graphLanguageModel, languageModel } from "./languageModel";
 import { modelTools } from "../tools/secondaryTools";
-import { AgentState } from "../agent_middleware";
+// import { AgentState } from "../agent_middleware";
 import z from "zod";
 import { createDeepAgent, FilesystemBackend } from "deepagents";
+import { StateSchema } from "@langchain/langgraph";
+import { graph1 } from "../graphs/schemas/graphSchema";
 const checkpointer = await getPostgressCheckpointer();
 
 const targetDir = "C:/Users/Rashm/Desktop/VIRTUAL"; // Avoid OneDrive
-
+export const AgentState = new StateSchema({
+  content: z.string().default(""), // Providing a default is highly recommended
+});
 export const mainAgent = createAgent({
   model: languageModel,
-  systemPrompt: systemPromptTest,
+  systemPrompt: mainAgentSystemPrompt,
   tools: modelTools,
-  // stateSchema: AgentState,
+  stateSchema: graph1,
+
   middleware: [
     // filesys
     // trimMessages,
     // todoListMiddleware(),
     humanInTheLoopMiddleware({
       interruptOn: {
+        toolA: true,
         CreateFileTool: {
           allowedDecisions: ["approve", "reject"],
           description: "Execute this command?",
