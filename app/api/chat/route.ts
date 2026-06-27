@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import { HITLResponse, HumanMessage } from "langchain";
 import { NextResponse } from "next/server";
 import { Command } from "@langchain/langgraph";
@@ -19,10 +20,33 @@ export async function POST(req: Request) {
         error: body.input.error,
       },
     };
+    // const imagePath = "C:\\Users\\Rashm\\images\\flag.png";
+
+    // const imageBuffer = fs.readFileSync(imagePath);
+    // const base64Image = imageBuffer.toString("base64");
+    // const mimeType = imagePath.toLowerCase().endsWith(".png")
+    //   ? "image/png"
+    //   : "image/jpeg";
+    
     await prismaUpsert(thread_id);
     const input = interruptResponse
       ? new Command({ resume: { decisions: interruptResponse.decisions } })
-      : { messages: [new HumanMessage(body.input.messages[0].content)] };
+      : {
+          messages: [
+            new HumanMessage({
+              content: [
+                { type: "text", text: body.input.messages[0].content },
+
+                // {
+                //   type: "image_url",
+                //   image_url: {
+                //     url: `${imagePath}`,
+                //   },
+                // },
+              ],
+            }),
+          ],
+        };
 
     // const mainAgent = await getMainAgent();
     const stream = await mainAgent.stream(input, {

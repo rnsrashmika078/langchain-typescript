@@ -15,3 +15,8 @@ export const codingModel = new ChatOllama({
   think: schema.languageModel.codingModel.reasoning,
   temperature: schema.languageModel.codingModel.temperature,
 });
+export const summarizeModel = new ChatOllama({
+  model: schema.languageModel.summarizeModel.model,
+  think: schema.languageModel.summarizeModel.reasoning,
+  temperature: schema.languageModel.summarizeModel.temperature,
+});

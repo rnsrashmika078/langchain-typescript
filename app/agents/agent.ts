@@ -1,16 +1,25 @@
 import {
   createAgent,
   humanInTheLoopMiddleware,
+  summarizationMiddleware,
   todoListMiddleware,
 } from "langchain";
-import { trimMessages } from "../agent_middleware";
+import { contentFilterMiddleware, trimMessages } from "../agent_middleware";
 import { getPostgressCheckpointer } from "../memory/memorySavers";
 import { mainAgentSystemPrompt } from "../data";
-import { graphLanguageModel, languageModel } from "./languageModel";
+import {
+  graphLanguageModel,
+  languageModel,
+  summarizeModel,
+} from "./languageModel";
 import { modelTools } from "../tools/secondaryTools";
 // import { AgentState } from "../agent_middleware";
 import z from "zod";
-import { createDeepAgent, FilesystemBackend } from "deepagents";
+import {
+  createDeepAgent,
+  createFilesystemMiddleware,
+  FilesystemBackend,
+} from "deepagents";
 import { StateSchema } from "@langchain/langgraph";
 import { graph1 } from "../graphs/schemas/graphSchema";
 const checkpointer = await getPostgressCheckpointer();
@@ -21,7 +30,9 @@ export const AgentState = new StateSchema({
 });
 export const mainAgent = createAgent({
   model: languageModel,
+  // systemPrompt: mainAgentSystemPrompt,
   systemPrompt: mainAgentSystemPrompt,
+
   tools: modelTools,
   stateSchema: graph1,
 
@@ -29,9 +40,26 @@ export const mainAgent = createAgent({
     // filesys
     // trimMessages,
     // todoListMiddleware(),
+    summarizationMiddleware({
+      model: summarizeModel,
+      trigger: { tokens: 4000 },
+      keep: { messages: 5 },
+    }),
+    // contentFilterMiddleware(["Fuck", "Sex"]),
+    // createFilesystemMiddleware({
+    //   backend: undefined,
+    //   systemPrompt: "Write to the filesystem when...",
+    //   customToolDescriptions: {
+    //     ls: "Use the ls tool when...",
+    //     read_file: "Use the read_file tool to...",
+    //   }, // Optional: Custom descriptions for filesystem tools
+    // }),
     humanInTheLoopMiddleware({
       interruptOn: {
-        toolA: true,
+        toolA: {
+          allowedDecisions: ["approve", "reject"],
+          description: "Execute this command?",
+        },
         CreateFileTool: {
           allowedDecisions: ["approve", "reject"],
           description: "Execute this command?",
@@ -47,10 +75,6 @@ export const mainAgent = createAgent({
   checkpointer: checkpointer,
 });
 
-const weatherSchema = z.object({
-  temperature: z.number(),
-  condition: z.string(),
-});
 // export const subAgent = createAgent({
 //   model: graphLanguageModel,
 //   systemPrompt:

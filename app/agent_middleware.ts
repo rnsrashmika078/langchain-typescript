@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RemoveMessage } from "@langchain/core/messages";
+import { AIMessage, RemoveMessage } from "@langchain/core/messages";
 import {
   Annotation,
   messagesStateReducer,
@@ -38,6 +38,46 @@ export const AgentState = Annotation.Root({
     reducer: messagesStateReducer,
   }),
 });
+export const contentFilterMiddleware = (bannedKeywords: string[]) => {
+  const keywords = bannedKeywords.map((kw) => kw.toLowerCase());
+
+  return createMiddleware({
+    name: "ContentFilterMiddleware",
+    beforeAgent: {
+      hook: (state) => {
+        // Get the first user message
+        if (!state.messages || state.messages.length === 0) {
+          return;
+        }
+
+        const firstMessage = state.messages[0];
+        if (firstMessage._getType() !== "human") {
+          return;
+        }
+
+        const content = firstMessage.content.toString().toLowerCase();
+
+        // Check for banned keywords
+        for (const keyword of keywords) {
+          if (content.includes(keyword)) {
+            // Block execution before any processing
+            return {
+              messages: [
+                new AIMessage(
+                  "I cannot process requests containing inappropriate content. Please rephrase your request.",
+                ),
+              ],
+              jumpTo: "end",
+            };
+          }
+        }
+
+        return;
+      },
+      canJumpTo: ["end"],
+    },
+  });
+};
 
 // 2. Create middleware that returns RemoveMessage
 export const deleteOldMessages = createMiddleware({

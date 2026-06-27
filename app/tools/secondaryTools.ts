@@ -11,10 +11,8 @@ import path, { dirname } from "path";
 import { UpdateFileTool } from "../graphs/graph1/FileMutationCommandGenerator";
 import { TavilySearch } from "@langchain/tavily";
 import { graph1 } from "../graphs/schemas/graphSchema";
-import { Command } from "@langchain/langgraph";
-import { compiledGraph } from "../graphs/graph1/graph";
-import { threadId } from "worker_threads";
 import { AgentState } from "../agents/agent";
+import ollama from "ollama";
 
 export const getWeatherTool = tool(
   async (
@@ -147,7 +145,6 @@ use to create file/files that not need much priority and not related to sequence
 parameters: 
   content,
   absoluteFilePath
-  operation
 
     NEVER ASSUME THE FILE PATH or rootDirectory. instead run ReadProjectTreeTool 
 `,
@@ -159,7 +156,6 @@ parameters:
           absolute file path to the file destination choose from ReadProjectTreeTool result
           example : "/src/component/first.txt"
         `),
-      operation: z.enum(["Create", "Update"]),
     }),
   },
 );
@@ -226,7 +222,9 @@ export const ShellCommandExecutor = tool(
     const rootPath = config?.configurable?.rootPath;
     const messageId = config?.configurable?.messageId;
 
+    const projectRelativePath = findProjectRoot(rootPath);
     console.log("Message Id from shell command exec", messageId);
+    console.log("projectRelativePath", projectRelativePath);
     console.log("rootPath from shell command exec", rootPath);
     let modifiedCommand = "";
 
@@ -234,11 +232,9 @@ export const ShellCommandExecutor = tool(
       config.writer({ message: "Executing command..." });
     }
 
-    if (!rootPath) {
+    if (!projectRelativePath) {
       return "You have currently doesn`t open any project, so you can't run shell commands that interact with file system.";
     }
-
-    const projectRelativePath = findProjectRoot(rootPath);
 
     if (
       command.includes("npm run dev") ||
@@ -364,30 +360,17 @@ export const toolA = tool(
     if (runtime.writer) {
       runtime.writer({ message: "finishUp tool..." });
     }
-
-    // const agentState = runtime.state;
-    // const threadId = runtime?.config?.configurable?.thread_id;
-
-    // const config = { configurable: { thread_id: threadId } };
-
-    // const state = await compiledGraph.getState(config);
-    // console.log("state:", state);
-
-    // // 3. Correct way to get the graph name
-    // const name = compiledGraph.getName();
-    // console.log("name:", name);
-
-    // const rootDir = await agentState?.rootDir;
-    // console.log("rootDir", rootDir);
-    // console.log("agentState", agentState);
-
-    const dirModified = path.isAbsolute(relativeFilePath)
-      ? relativeFilePath
-      : path.join(rootDir, relativeFilePath);
-    mkdirSync(dirname(dirModified), { recursive: true });
-    writeFileSync(dirModified, content || "", "utf-8");
-
-    return { status: operation };
+    try {
+      const dirModified = path.isAbsolute(relativeFilePath)
+        ? relativeFilePath
+        : path.join(rootDir, relativeFilePath);
+      mkdirSync(dirname(dirModified), { recursive: true });
+      writeFileSync(dirModified, content || "", "utf-8");
+      return `${operation} successfully executed!`;
+    } catch (err) {
+      const e = err instanceof Error ? err.message : `error while ${operation}`;
+      return e;
+    }
   },
   {
     name: "toolA",
@@ -408,39 +391,45 @@ export const toolA = tool(
     }),
   },
 );
-export const toolB = tool(
+export const imageRecognizer = tool(
   async (
     {
-      query,
+      imagePath,
     }: {
-      query: string;
+      imagePath: string;
     },
     runtime: ToolRuntime<typeof AgentState.State>,
   ) => {
     if (runtime.writer) {
-      runtime.writer({ message: "finishUp tool..." });
+      runtime.writer({ message: "Reading image..." });
     }
+    console.log("Image path", imagePath);
 
-    const agentState = runtime.state;
-    // const threadId = runtime?.config?.configurable?.thread_id;
+    const modifiedPath = !imagePath.includes("/")
+      ? imagePath.replaceAll("\\", "\\\\")
+      : imagePath.replaceAll("//", "/");
+    const response = await ollama.chat({
+      model: "gemma4:e2b",
+      messages: [
+        {
+          role: "user",
+          content: "describe image",
+          images: [modifiedPath],
+        },
+      ],
+      stream: false,
+    });
+    const content = response.message.content;
 
-    // const config = { configurable: { thread_id: threadId } };
-
-    // const state = await compiledGraph.getState(config);
-    // console.log("state:", state);
-
-    // // 3. Correct way to get the graph name
-    // const name = compiledGraph.getName();
-    // console.log("name:", name);
-
-    const content = agentState?.content;
-    console.log("content", content);
+    console.log(response.message.content);
     return { content };
   },
   {
-    name: "toolB",
+    name: "imageRecognizer",
     schema: z.object({
-      query: z.string().describe("The  query"),
+      imagePath: z
+        .string()
+        .describe("Absolute path to the image that user given"),
     }),
   },
 );
@@ -452,8 +441,8 @@ export const modelTools = [
   UpdateFileTool,
   ShellCommandExecutor,
   checkFileAttachment,
+  imageRecognizer,
   // configureTailwind,
   toolA,
-  toolB,
   internetSearch,
 ];

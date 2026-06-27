@@ -12,6 +12,11 @@
       "model": "deepseek-coder:6.7b",
       "reasoning": false,
       "temperature": 0
+    },
+    "summarizeModel": {
+      "model": "qwen2.5-coder:3b",
+      "reasoning": false,
+      "temperature": 0
     }
   }
 }
